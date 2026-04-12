@@ -1,0 +1,457 @@
+基于我们的讨论，以下是完整的**虚拟Team系统架构设计文档**：
+
+---
+
+# 虚拟Team系统架构设计文档 v1.0
+
+**项目代号**: AgentOffice  
+**设计目标**: 构建基于斯坦福小镇理念的虚拟团队协作系统，通过多Agent协作处理需求并给出解决方案  
+**核心特色**: Claude Code驱动Agent + Obsidian纯文本存储 + 像素风格可视化  
+
+---
+
+## 1. 整体架构概览
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              用户层 (User Layer)                             │
+│  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────────────┐   │
+│  │   需求方用户      │  │   观察员/管理员   │  │      开发者/运维          │   │
+│  │  (提交问题需求)   │  │  (监控干预流程)   │  │   (调整Agent配置)        │   │
+│  └────────┬─────────┘  └────────┬─────────┘  └───────────┬──────────────┘   │
+└───────────┼─────────────────────┼────────────────────────┼──────────────────┘
+            │                     │                        │
+            ▼                     ▼                        ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           前端层 (Frontend Layer)                            │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │                    虚拟办公空间 (Virtual Office)                      │   │
+│  │  技术栈: React 18 + TypeScript + PixiJS + Socket.io-client           │   │
+│  │                                                                     │   │
+│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  │   │
+│  │  │  2D办公地图  │  │  Agent角色   │  │  实时动画    │  │  交互气泡    │  │   │
+│  │  │  (PixiJS)   │  │  (Sprite)   │  │ (移动/工作)  │  │ (对话/状态)  │  │   │
+│  │  └─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘  │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │                    工作流面板 (Workflow Dashboard)                   │   │
+│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  │   │
+│  │  │  流程图谱    │  │  实时日志    │  │  任务看板    │  │  人工介入    │  │   │
+│  │  │ (Mermaid.js)│  │ (SSE流式)   │  │ (Kanban)    │  │ (暂停/修改)  │  │   │
+│  │  └─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘  │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+└──────────────────────────┬──────────────────────────────────────────────────┘
+                           │ WebSocket / HTTP
+┌──────────────────────────▼──────────────────────────────────────────────────┐
+│                      编排层 (Orchestration Layer)                          │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │                    Supervisor Agent (团队主管)                        │   │
+│  │  技术栈: Python 3.11 + asyncio + subprocess + Git Worktree           │   │
+│  │                                                                     │   │
+│  │  核心能力：                                                          │   │
+│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  │   │
+│  │  │  进程池管理  │  │  并发控制    │  │  健康检查    │  │  优雅关闭    │  │   │
+│  │  │ (max 5-10)  │  │ (信号量)     │  │ (心跳检测)   │  │ (SIGTERM)   │  │   │
+│  │  └─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘  │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │                    专业Agent团队 (每个Agent = 1个Claude Code进程)      │   │
+│  │                                                                     │   │
+│  │  隔离方案: Git Worktree (独立工作目录，零冲突)                        │   │
+│  │  执行方式: claude -p "<系统提示词>" --worktree <name> --output-format json│   │
+│  │                                                                     │   │
+│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  │   │
+│  │  │  需求分析师  │  │  方案架构师  │  │  资料研究员  │  │  方案撰写员  │  │   │
+│  │  │ (agent-001) │  │ (agent-002) │  │ (agent-003) │  │ (agent-004) │  │   │
+│  │  └─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘  │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+└──────────────────────────┬──────────────────────────────────────────────────┘
+                           │ 文件系统接口 / CLI调用
+┌──────────────────────────▼──────────────────────────────────────────────────┐
+│                      基础设施层 (Infrastructure Layer)                       │
+│                     📁 Obsidian Vault (纯文本存储)                          │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │  A. 向量搜索与记忆检索 (QMD - Query Markdown Documents)              │   │
+│  │  技术: @tobilu/qmd (BM25 + 向量混合搜索)                              │   │
+│  │  存储: ~/.qmd/collections/ (SQLite索引 + 本地GGUF嵌入模型)            │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │  B. 状态存储 (Markdown文件系统)                                       │   │
+│  │  访问: Obsidian CLI REST API (http://127.0.0.1:27124)                │   │
+│  │  结构:                                                               │   │
+│  │  ~/VirtualTeamVault/                                                 │   │
+│  │  ├── 📁 agents/                       # Agent定义 (YAML配置)          │   │
+│  │  ├── 📁 sessions/                    # 工作流实例 (最终结果)          │   │
+│  │  ├── 📁 memory/                      # 持久化共享记忆                │   │
+│  │  ├── 📁 .claude/worktrees/           # 临时工作目录 (Git Worktree)    │   │
+│  │  └── 📄 全局状态.md                   # 运行时状态                    │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 2. 前端层详细设计
+
+### 2.1 技术选型
+
+| 组件 | 技术 | 理由 |
+|------|------|------|
+| 渲染引擎 | **PixiJS** | AI Town验证，轻量高性能，适合Agent可视化而非复杂游戏 |
+| 地图编辑 | **Tiled** | 行业标准，导出JSON直接解析 |
+| 动画系统 | 自定义SpriteSheet | 参考AI Town实现，支持四方向行走/工作/思考动画 |
+| UI框架 | React 18 + Tailwind | 覆盖层UI与游戏画布分离，便于维护 |
+| 实时通信 | Socket.io | 双向事件驱动，支持Agent状态实时同步 |
+
+### 2.2 素材规范
+
+**角色SpriteSheet标准**：
+- **尺寸**: 32x32 像素/帧 (或16x16/64x64)
+- **动画状态**:
+  - `idle`: 2-4帧 (呼吸/待机动画)
+  - `walk`: 4-8帧，四方向 (上下左右)
+  - `work`: 4-6帧 (打字/书写/画图)
+  - `think`: 2-4帧 + 气泡图标 (思考状态)
+- **布局**: 横向排列，每行一个动画方向
+- **格式**: PNG透明背景
+
+**推荐素材来源**：
+- **免费商用**: OpenGameArt (CC0), 0x72's Tilesets, George Bailey 16x16素材
+- **AI生成**: PixelLab, PixelBox (文生像素角色+自动动画)
+
+### 2.3 核心功能实现
+
+**状态机动画管理**：
+```typescript
+class AgentCharacter {
+  private state: 'idle' | 'walking' | 'working' | 'thinking';
+  
+  setState(newState: AgentState) {
+    this.state = newState;
+    switch(newState) {
+      case 'walking':
+        this.sprite.textures = this.animations.walk;
+        this.animationSpeed = 0.15;
+        break;
+      case 'working':
+        this.sprite.textures = this.animations.work;
+        // 显示工作进度条
+        this.showProgressBar();
+        break;
+      case 'thinking':
+        this.sprite.textures = this.animations.think;
+        // 显示思考气泡，内容来自Claude Code实时输出
+        this.showThoughtBubble(currentThought);
+        break;
+    }
+    this.sprite.play();
+  }
+}
+```
+
+**实时状态同步**：
+- **WebSocket事件**: `agent:state-change`, `agent:position-update`, `agent:thought-update`
+- **视觉反馈**: 
+  - Agent移动时绘制轨迹线
+  - 工作状态显示键盘敲击动画
+  - 思考状态显示浮动的"..."气泡
+
+---
+
+## 3. 编排层详细设计
+
+### 3.1 Claude Code多实例架构
+
+**核心设计**: 每个专业Agent对应一个独立的Claude Code进程，通过Git Worktree实现文件系统隔离。
+
+**进程生命周期**：
+```
+1. Supervisor接收任务 → 创建Git Worktree (.claude/worktrees/<session>-<agent>/)
+2. 复制输入文件 (如00-原始需求.md) 到Worktree
+3. 启动进程: claude -p "<系统提示词+任务>" --worktree <name> --output-format json
+4. Claude Code在隔离目录中执行，输出写入本地Markdown文件
+5. 进程结束 → Supervisor同步结果回Vault/sessions/目录 → 清理Worktree
+```
+
+**并发控制**：
+- **信号量限制**: 默认max_concurrent=5 (受API rate limit限制)
+- **超时机制**: 单任务max 180秒，超时自动终止
+- **健康检查**: 心跳检测，僵死进程自动重启
+
+### 3.2 Agent定义配置
+
+**YAML配置示例** (`agents/需求分析师.yaml`)：
+```yaml
+---
+name: 需求分析师
+id: agent-001
+isolation: worktree  # 强制独立工作目录
+model: claude-3-7-sonnet-20250219
+temperature: 0.3
+max_turns: 20
+tools: ["Read", "Write", "Bash", "Grep"]
+worktree_config:
+  auto_cleanup: false  # 保留用于审计
+  env_files: [".env"]
+---
+
+## 角色描述
+负责理解需求方问题，输出结构化PRD文档。
+
+## 工作流程
+1. 读取 `00-原始需求.md`
+2. 识别不确定性（5W2H框架）
+3. 输出到 `01-需求澄清.md`
+
+## 输出规范
+- Markdown格式，包含YAML frontmatter
+- 必须包含：需求摘要、用户故事、功能需求、待确认问题
+```
+
+### 3.3 Supervisor进程管理代码
+
+```python
+class ClaudeProcessManager:
+    def __init__(self, vault_path: Path, max_concurrent: int = 5):
+        self.vault = vault_path
+        self.semaphore = asyncio.Semaphore(max_concurrent)
+        self.active_tasks: Dict[str, AgentTask] = {}
+    
+    async def spawn_agent(self, task: AgentTask):
+        # 1. 创建Git Worktree
+        worktree_path = self.vault / ".claude" / "worktrees" / task.worktree_name
+        await self._create_worktree(task.worktree_name)
+        
+        # 2. 构建命令
+        cmd = [
+            "claude", "-p", task.prompt,
+            "--worktree", task.worktree_name,
+            "--allowedTools", "Read,Write,Bash,Grep",
+            "--output-format", "json"
+        ]
+        
+        # 3. 启动进程
+        async with self.semaphore:
+            process = await asyncio.create_subprocess_exec(
+                *cmd, cwd=worktree_path,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+            # 4. 监控并同步状态
+            asyncio.create_task(self._monitor_process(task, process))
+```
+
+---
+
+## 4. 基础设施层详细设计
+
+### 4.1 Obsidian Vault文件结构
+
+```
+~/VirtualTeamVault/
+├── 📁 agents/                    # Agent定义 (YAML frontmatter)
+│   ├── 需求分析师.yaml
+│   ├── 方案架构师.yaml
+│   └── templates/                # 创建模板
+│
+├── 📁 sessions/                  # 工作流实例 (按日期组织)
+│   └── 📂 2026-04-10-10-20-001/
+│       ├── meta.md               # 会话元数据 (状态/进度/Agent列表)
+│       ├── 00-原始需求.md        # 输入
+│       ├── 01-需求澄清.md        # Agent-001输出
+│       ├── 02-技术方案.md        # Agent-002输出
+│       ├── 03-参考资料.md        # Agent-003输出
+│       ├── 04-最终方案.md        # Agent-004输出
+│       └── 📁 artifacts/         # 产物 (图表/代码/文档)
+│
+├── 📁 memory/                    # 持久化共享记忆 (QMD索引)
+│   ├── 决策记录.md
+│   ├── 用户偏好.md
+│   ├── 项目知识.md
+│   └── 最佳实践.md
+│
+├── 📁 kanban/                    # 看板状态
+│   ├── 当前任务.md
+│   └── 历史归档.md
+│
+├── 📁 .claude/worktrees/         # 临时工作目录 (Git Worktree)
+│   └── (自动创建/清理)
+│
+└── 📄 全局状态.md                 # 全局运行时状态
+```
+
+### 4.2 QMD向量搜索集成
+
+**功能**: 替代传统向量数据库，实现本地混合搜索。
+
+**技术栈**: 
+- **BM25**: SQLite FTS5全文索引 (精确匹配)
+- **向量搜索**: 本地GGUF嵌入模型 (embedding-gemma-300M)
+- **重排序**: qwen3-reranker (提升准确性)
+
+**使用场景**:
+- Agent启动时检索相关历史案例 (`memory/最佳实践.md`)
+- 方案撰写时检索技术资料 (`memory/项目知识.md`)
+- 实时相似度去重
+
+**调用示例**:
+```bash
+# 混合搜索
+qmd query "电商高并发架构" --collection memory -n 5 --json
+
+# 在Agent提示词中引用
+context=$(qmd query "$user_query" --collection memory -n 3)
+claude -p "基于以下相关案例: $context, 分析当前需求..."
+```
+
+### 4.3 状态同步机制
+
+**双写策略**:
+1. **Claude Code进程**: 写入本地Worktree文件 (高性能，无锁)
+2. **Supervisor监控**: 进程结束后同步到Vault/sessions/ (持久化，可观测)
+3. **前端实时推送**: 通过WebSocket广播状态变更 (实时可视化)
+
+---
+
+## 5. 关键交互流程
+
+### 5.1 需求处理主流程
+
+```
+用户提交需求
+    ↓
+Supervisor创建会话目录 (sessions/2026-04-10-xxx/)
+    ↓
+Phase 1: 需求澄清
+  ├─ 启动 Claude Code (agent-001, worktree-1)
+  ├─ 读取 00-原始需求.md
+  ├─ 输出 01-需求澄清.md
+  └─ 前端显示"需求分析师"角色思考动画
+    ↓
+Phase 2: 并行设计 (信号量控制)
+  ├─ 同时启动 agent-002 (架构师) + agent-003 (研究员)
+  ├─ 各自在独立worktree中执行
+  ├─ 实时同步思考过程到前端气泡
+  └─ 输出 02-技术方案.md + 03-参考资料.md
+    ↓
+Phase 3: 整合输出
+  ├─ 启动 agent-004 (撰写员)
+  ├─ QMD检索相关最佳实践作为参考
+  └─ 输出 04-最终方案.md
+    ↓
+Supervisor审核 → 人工介入点(可选) → 标记完成
+    ↓
+前端展示最终结果 + 归档到kanban/历史归档.md
+```
+
+### 5.2 实时可视化同步
+
+```
+Claude Code进程输出日志
+    ↓
+Supervisor解析关键事件 (思考/写入文件/完成)
+    ↓
+WebSocket推送到前端
+    ↓
+PixiJS更新角色状态:
+  - setState('thinking') + 显示思考内容
+  - setState('working') + 进度条动画
+  - moveTo(targetX, targetY) 角色移动到目标工位
+    ↓
+React UI面板更新:
+  - 工作流图谱高亮当前节点
+  - 实时日志流显示Agent输出
+  - 文件预览面板同步Obsidian文件内容
+```
+
+---
+
+## 6. 部署与运维
+
+### 6.1 环境要求
+
+| 组件 | 开发环境 | 生产环境 |
+|------|---------|---------|
+| **操作系统** | macOS/Linux | Linux (Ubuntu 22.04+) |
+| **Node.js** | 18+ | 18+ |
+| **Python** | 3.11+ | 3.11+ |
+| **Claude Code** | 最新版 | 最新版 (Docker隔离) |
+| **Obsidian** | Desktop (GUI) | CLI Server (Headless) |
+| **QMD** | 本地安装 | 守护进程模式 |
+| **Git** | 2.35+ (支持worktree) | 2.35+ |
+
+### 6.2 部署架构
+
+**推荐方案: Docker Compose**
+
+```yaml
+services:
+  frontend:
+    build: ./frontend
+    ports: ["3000:3000"]
+  
+  supervisor:
+    build: ./supervisor
+    volumes:
+      - ./vault:/vault:rw
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+  
+  obsidian-server:
+    image: obsidian-cli-server  # Headless模式
+    volumes:
+      - ./vault:/vault:rw
+  
+  qmd:
+    image: qmd-local
+    volumes:
+      - ~/.qmd:/root/.qmd:rw
+      - ./vault:/vault:ro
+```
+
+### 6.3 监控与日志
+
+- **进程监控**: Supervisor记录每个Claude Code进程的PID、启动时间、资源消耗
+- **文件审计**: 所有Worktree保留或归档，支持完整回放
+- **成本追踪**: 记录每个会话的API Token消耗，设置预算告警
+- **异常处理**: 进程僵死自动重启，失败任务自动重试(最多3次)
+
+---
+
+## 7. 开发路线图
+
+| 阶段 | 周期 | 关键里程碑 |
+|------|------|-----------|
+| **Phase 1** | 2周 | 基础架构搭建: Vault结构、QMD索引、Supervisor进程管理 |
+| **Phase 2** | 2周 | 前端基础: PixiJS场景、角色渲染、地图加载、基础动画 |
+| **Phase 3** | 2周 | Claude Code集成: 多实例并发、Worktree隔离、状态同步 |
+| **Phase 4** | 2周 | 工作流实现: 四Agent协作流程、人工介入点、看板功能 |
+| **Phase 5** | 2周 | 高级功能: Obsidian实时预览、多用户协作、录制回放 |
+
+---
+
+## 8. 风险与缓解
+
+| 风险 | 影响 | 缓解措施 |
+|------|------|---------|
+| **Claude Code并发限制** | 高 | 信号量控制(max 5)，队列缓冲，超时强制终止 |
+| **Windows文件锁** | 中 | 仅支持Linux/macOS生产环境，Windows仅开发 |
+| **API成本失控** | 高 | 预算上限、Token消耗实时监控、本地模型备选 |
+| **Worktree磁盘占用** | 中 | 自动清理策略，保留7天后归档压缩 |
+| **前端性能(50+角色)** | 中 | 相机视口裁剪，LOD简化，WebGL批处理 |
+
+---
+
+## 9. 参考资源
+
+- **AI Town源码**: [a16z-infra/ai-town](https://github.com/a16z-infra/ai-town) - PixiJS渲染参考
+- **Claude Code文档**: [docs.anthropic.com/claude-code](https://docs.anthropic.com/claude-code) - CLI使用指南
+- **QMD项目**: [Tobi-Akindele/qmd](https://github.com/Tobi-Akindele/qmd) - 本地混合搜索
+- **Tiled编辑器**: [mapeditor.org](https://www.mapeditor.org) - 地图设计工具
+
+---
+
+**文档状态**: Draft v1.0  
+**最后更新**: 2026-04-10  
+**维护者**: 架构组
