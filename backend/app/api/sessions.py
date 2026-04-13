@@ -1,7 +1,7 @@
 # backend/app/api/sessions.py
 from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
 
-from app.workflow.models import CreateSessionRequest
+from app.workflow.models import CreateSessionRequest, SessionStatus
 from app.workflow.engine import WorkflowEngine
 from app.ws.manager import WebSocketManager
 
@@ -55,6 +55,77 @@ async def get_output_file(session_id: str, filename: str):
     if content is None:
         raise HTTPException(status_code=404, detail="File not found")
     return {"filename": filename, "content": content}
+
+
+@router.get("/sessions/{session_id}/workflow")
+async def get_workflow(session_id: str):
+    """Get workflow phase details for a session."""
+    assert _engine is not None
+    session = _engine.get_session(session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return {
+        "session_id": session.id,
+        "status": session.status,
+        "mode": session.mode,
+        "phases": [
+            {
+                "id": p.id,
+                "name": p.name,
+                "status": p.status,
+                "agents": p.agents,
+                "outputs": p.outputs,
+                "started_at": p.started_at.isoformat() if p.started_at else None,
+                "completed_at": p.completed_at.isoformat() if p.completed_at else None,
+            }
+            for p in session.phases
+        ],
+    }
+
+
+@router.post("/sessions/{session_id}/pause")
+async def pause_session(session_id: str):
+    """Pause a running session."""
+    assert _engine is not None
+    session = _engine.get_session(session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail="Session not found")
+    if session.status != "running":
+        raise HTTPException(status_code=400, detail=f"Cannot pause session in '{session.status}' state")
+    session.status = SessionStatus.PAUSED
+    _engine.vault_manager.update_session(session)
+    await _ws_manager.emit(session_id, "session:paused")
+    return session.model_dump(mode="json")
+
+
+@router.post("/sessions/{session_id}/resume")
+async def resume_session(session_id: str):
+    """Resume a paused session."""
+    assert _engine is not None
+    session = _engine.get_session(session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail="Session not found")
+    if session.status != "paused":
+        raise HTTPException(status_code=400, detail=f"Cannot resume session in '{session.status}' state")
+    session.status = SessionStatus.RUNNING
+    _engine.vault_manager.update_session(session)
+    await _ws_manager.emit(session_id, "session:started")
+    return session.model_dump(mode="json")
+
+
+@router.post("/sessions/{session_id}/cancel")
+async def cancel_session(session_id: str):
+    """Cancel a session."""
+    assert _engine is not None
+    session = _engine.get_session(session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail="Session not found")
+    if session.status == SessionStatus.CANCELLED:
+        raise HTTPException(status_code=400, detail=f"Cannot cancel session in '{session.status}' state")
+    session.status = SessionStatus.CANCELLED
+    _engine.vault_manager.update_session(session)
+    await _ws_manager.emit(session_id, "session:cancelled")
+    return session.model_dump(mode="json")
 
 
 @router.websocket("/ws/sessions/{session_id}")
