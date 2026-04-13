@@ -461,3 +461,15 @@ open http://localhost:8000/docs                                # API 文档
 - 所有数据通过 REST API 获取
 - 实时状态通过 WebSocket `/ws/sessions/{id}` 推送
 - 前端只需对接 API，无需了解后端内部实现
+
+**前端技术参考 — 斯坦福小镇 (AI Town)**：
+- 参考仓库：[a16z-infra/ai-town](https://github.com/a16z-infra/ai-town)
+- 核心参考内容：
+  - **PixiJS 渲染架构**：2D 像素风格地图、角色 Sprite 管理、相机视口控制
+  - **角色动画系统**：四方向行走/工作/思考状态动画、SpriteSheet 切换
+  - **实时交互**：角色移动轨迹绘制、对话气泡、状态指示器
+  - **地图系统**：Tiled 地图编辑器导出 JSON、碰撞检测、路径寻路
+  - **游戏性交互**：点击角色查看详情、拖拽视角、缩放地图、观察 Agent 实时行为
+- 技术栈：React 18 + PixiJS + Tailwind CSS + Socket.io-client
+- 素材规范：32x32 像素 SpriteSheet，PNG 透明背景，idle/walk/work/think 四种动画状态
+- 目标：不是静态数据面板，而是类似游戏世界的沉浸式交互体验
