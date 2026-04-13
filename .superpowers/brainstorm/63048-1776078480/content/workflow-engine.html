@@ -1,0 +1,102 @@
+<h2>工作流引擎设计</h2>
+<p class="subtitle">Agent 协作流程与状态机</p>
+
+<div class="section">
+  <h3>默认四角色工作流</h3>
+  <div class="mockup">
+    <div class="mockup-header">Sequential + Parallel Hybrid Flow</div>
+    <div class="mockup-body" style="padding: 24px; background: #1a1a2e; color: #e0e0e0; font-family: monospace; font-size: 13px; line-height: 1.6;">
+      <pre style="margin:0; color: #e0e0e0;">
+用户提交需求 "设计一个电商系统"
+         │
+         ▼
+┌─────────────────┐
+│   Phase 1       │  ← 顺序执行
+│   需求分析师     │     输入: 00-原始需求.md
+│   (agent-001)   │     输出: 01-需求澄清.md
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────────────────────┐
+│        Phase 2                  │  ← 并行执行
+│  ┌──────────┐  ┌──────────┐    │
+│  │ 方案架构师│  │ 资料研究员│    │
+│  │(agent-002)│  │(agent-003)│    │
+│  └─────┬────┘  └─────┬────┘    │
+│   输出: 02-技术方案.md          │
+│   输出: 03-参考资料.md          │
+└────────┼─────────────┼─────────┘
+         │             │
+         ▼             ▼
+┌─────────────────┐
+│   Phase 3       │  ← 顺序执行
+│   方案撰写员     │     输入: 01+02+03
+│   (agent-004)   │     输出: 04-最终方案.md
+└────────┬────────┘
+         │
+         ▼
+    审核完成 → 通知用户
+      </pre>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>头脑风暴模式</h3>
+  <div class="mockup">
+    <div class="mockup-header">Brainstorm Mode (Round-Robin)</div>
+    <div class="mockup-body" style="padding: 24px; background: #1a1a2e; color: #e0e0e0; font-family: monospace; font-size: 13px; line-height: 1.6;">
+      <pre style="margin:0; color: #e0e0e0;">
+用户提交需求 + 选择"头脑风暴"模式 + 指定N个角色
+         │
+         ▼
+┌─────────────────────────────────────┐
+│           Round 1                    │
+│  ┌───────┐ ┌───────┐ ┌───────┐     │  ← 并行
+│  │Agent A│ │Agent B│ │Agent C│     │
+│  │提出观点│ │提出观点│ │提出观点│     │
+│  └───┬───┘ └───┬───┘ └───┬───┘     │
+└──────┼─────────┼─────────┼─────────┘
+       │         │         │
+       ▼         ▼         ▼
+┌─────────────────────────────────────┐
+│           Round 2                    │
+│  ┌───────┐ ┌───────┐ ┌───────┐     │  ← 并行，每人看到其他人上一轮观点
+│  │Agent A│ │Agent B│ │Agent C│     │
+│  │回应补充│ │回应补充│ │回应补充│     │
+│  └───┬───┘ └───┬───┘ └───┬───┘     │
+└──────┼─────────┼─────────┼─────────┘
+       │         │         │
+       ... (重复 N 轮) ...
+       │         │         │
+       ▼         ▼         ▼
+┌─────────────────┐
+│  整合Agent       │  ← 汇总所有观点输出最终文档
+│  输出综合报告    │
+└─────────────────┘
+      </pre>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>会话状态机</h3>
+  <div class="mockup">
+    <div class="mockup-header">Session State Machine</div>
+    <div class="mockup-body" style="padding: 24px; background: #1a1a2e; color: #e0e0e0; font-family: monospace; font-size: 13px; line-height: 1.6;">
+      <pre style="margin:0; color: #e0e0e0;">
+  ┌───────┐     ┌─────────┐     ┌──────────┐
+  │created│────→│ running │────→│completed │
+  └───────┘     └────┬────┘     └──────────┘
+                     │
+              ┌──────┼──────┐
+              ▼      ▼      ▼
+         ┌────────┐ ┌──────┐ ┌───────┐
+         │paused │→│failed│ │cancelled│
+         └───┬───┘ └──────┘ └───────┘
+             │
+             └────→ running (恢复)
+      </pre>
+    </div>
+  </div>
+</div>

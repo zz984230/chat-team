@@ -1,0 +1,117 @@
+<h2>应用启动与组件连接</h2>
+<p class="subtitle">FastAPI 入口、配置管理、组件依赖关系</p>
+
+<div class="section">
+  <h3>组件依赖关系</h3>
+  <div class="mockup">
+    <div class="mockup-header">Dependency Graph</div>
+    <div class="mockup-body" style="padding: 24px; background: #1a1a2e; color: #e0e0e0; font-family: monospace; font-size: 13px; line-height: 1.6;">
+      <pre style="margin:0;">
+                    FastAPI App
+                   ┌─────┴─────┐
+                   │           │
+              API Router   WS Manager
+                   │           │
+              ┌────┴────┐      │
+              │         │      │
+         SessionSvc  AgentSvc  │
+              │         │      │
+              └────┬────┘      │
+                   │           │
+             WorkflowEngine ───┤ (广播事件)
+                   │           │
+              ┌────┴────┐      │
+              │         │      │
+          AgentPool  VaultMgr  │
+              │                 │
+         AgentRunner           │
+              │                 │
+         Claude CLI             │
+              │                 │
+         临时工作目录            │
+                              │
+         Config ◄─────────────┘
+           (settings.yaml)
+      </pre>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>配置文件</h3>
+  <div class="mockup">
+    <div class="mockup-header">settings.yaml</div>
+    <div class="mockup-body" style="padding: 24px; background: #1a1a2e; color: #e0e0e0; font-family: monospace; font-size: 13px; line-height: 1.5;">
+      <pre style="margin:0;">
+<span style="color:#569cd6;">server:</span>
+  host: "0.0.0.0"
+  port: 8000
+  cors_origins: ["http://localhost:3000"]
+
+<span style="color:#569cd6;">agent:</span>
+  max_concurrent: 5
+  timeout_seconds: 300
+  retry_count: 1
+  work_dir: "/tmp/agentoffice"
+
+<span style="color:#569cd6;">vault:</span>
+  path: "./vault"
+
+<span style="color:#569cd6;">workflow:</span>
+  default_mode: "default"        <span style="color:#6a9955;"># default | brainstorm</span>
+  brainstorm_rounds: 3
+
+<span style="color:#569cd6;">logging:</span>
+  level: "INFO"
+  file: "./logs/agentoffice.log"
+      </pre>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>启动流程</h3>
+  <div class="mockup">
+    <div class="mockup-header">Application Bootstrap</div>
+    <div class="mockup-body" style="padding: 24px; background: #1a1a2e; color: #e0e0e0; font-family: monospace; font-size: 13px; line-height: 1.6;">
+      <pre style="margin:0;">
+<span style="color:#dcdcaa;">1. 加载配置</span>
+   config = load_config("settings.yaml")
+
+<span style="color:#dcdcaa;">2. 初始化 Vault</span>
+   vault_mgr = VaultManager(config.vault.path)
+   vault_mgr.ensure_structure()      <span style="color:#6a9955;"># 确保 agents/sessions/ 等目录存在</span>
+   vault_mgr.load_agent_definitions() <span style="color:#6a9955;"># 加载 agents/*.yaml</span>
+
+<span style="color:#dcdcaa;">3. 创建组件</span>
+   pool = AgentPool(config.agent)
+   ws_manager = WebSocketManager()
+   engine = WorkflowEngine(pool, vault_mgr, ws_manager)
+
+<span style="color:#dcdcaa;">4. 创建 FastAPI</span>
+   app = create_app(config, engine, ws_manager)
+
+<span style="color:#dcdcaa;">5. 启动服务</span>
+   uvicorn.run(app, host=config.server.host,
+                     port=config.server.port)
+      </pre>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>开发命令</h3>
+  <div style="background: #2d2d44; padding: 16px; border-radius: 8px; font-family: monospace; font-size: 13px; color: #e0e0e0; line-height: 1.8;">
+    <div><span style="color:#6a9955;"># 安装依赖</span></div>
+    <div>cd backend && uv sync</div>
+    <br>
+    <div><span style="color:#6a9955;"># 运行开发服务器</span></div>
+    <div>uv run uvicorn app.main:app --reload --port 8000</div>
+    <br>
+    <div><span style="color:#6a9955;"># 运行测试</span></div>
+    <div>uv run pytest tests/ -v</div>
+    <br>
+    <div><span style="color:#6a9955;"># API 文档（自动生成）</span></div>
+    <div>open http://localhost:8000/docs</div>
+  </div>
+</div>

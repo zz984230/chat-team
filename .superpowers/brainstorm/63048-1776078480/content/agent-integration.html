@@ -1,0 +1,107 @@
+<h2>Agent 执行与 CLI 集成</h2>
+<p class="subtitle">Claude CLI 子进程生命周期与输出解析</p>
+
+<div class="section">
+  <h3>Agent 执行生命周期</h3>
+  <div class="mockup">
+    <div class="mockup-header">Agent Lifecycle</div>
+    <div class="mockup-body" style="padding: 24px; background: #1a1a2e; color: #e0e0e0; font-family: monospace; font-size: 13px; line-height: 1.6;">
+      <pre style="margin:0;">
+WorkflowEngine.submit(requirement)
+         │
+         ▼
+  <span style="color:#569cd6;">1. 准备阶段</span>
+     ├─ 创建 session 目录: vault/sessions/{id}/
+     ├─ 写入 00-原始需求.md
+     └─ 加载 meta.yaml 模板
+         │
+         ▼
+  <span style="color:#569cd6;">2. Phase 1: 需求分析师</span>
+     ├─ pool.submit(analyst_runner)
+     │   ├─ runner.prepare()
+     │   │   ├─ 创建临时工作目录: /tmp/agentoffice/{session}/analyst/
+     │   │   ├─ 复制 00-原始需求.md 到工作目录
+     │   │   └─ 构建系统提示词（YAML定义 + 输出规范）
+     │   ├─ runner.execute()
+     │   │   ├─ 启动: claude -p "{prompt}" --output-format stream-json
+     │   │   ├─ 流式读取 stdout → 解析 JSON 事件
+     │   │   │   ├─ "thinking"  → 广播 agent:thinking
+     │   │   │   ├─ "tool_use"  → 广播 agent:working
+     │   │   │   └─ "text"      → 广播 agent:thinking
+     │   │   └─ 进程退出（code=0）
+     │   └─ runner.collect()
+     │       ├─ 扫描工作目录，找到 01-需求澄清.md
+     │       ├─ 复制到 vault/sessions/{id}/01-需求澄清.md
+     │       └─ 清理临时工作目录
+     └─ Phase 1 完成，广播 phase:completed
+         │
+         ▼
+  <span style="color:#569cd6;">3. Phase 2: 并行执行</span>
+     ├─ tasks = [pool.submit(architect), pool.submit(researcher)]
+     ├─ await asyncio.gather(*tasks)  ← 信号量控制并发
+     └─ 两个 Agent 结果收集后广播 phase:completed
+         │
+         ▼
+  <span style="color:#569cd6;">4. Phase 3: 整合输出</span>
+     └─ 同 Phase 1 流程，输入为 01+02+03 全部文件
+         │
+         ▼
+  广播 session:completed
+      </pre>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>CLI 输出解析</h3>
+  <div class="mockup">
+    <div class="mockup-header">stream-json Output Format</div>
+    <div class="mockup-body" style="padding: 24px; background: #1a1a2e; color: #e0e0e0; font-family: monospace; font-size: 12px; line-height: 1.5;">
+      <pre style="margin:0;">
+<span style="color:#6a9955;">// claude --output-format stream-json 每行输出一个 JSON 对象</span>
+
+<span style="color:#6a9955;">// 1. 思考内容（Claude 的推理文本）</span>
+{"type":"assistant","subtype":"text","content":"分析需求中的关键点..."}
+
+<span style="color:#6a9955;">// 2. 工具调用（Agent 在读/写文件）</span>
+{"type":"assistant","subtype":"tool_use","name":"Write",
+ "input":{"file_path":"01-需求澄清.md","content":"# 需求澄清\n..."}}
+
+<span style="color:#6a9955;">// 3. 工具结果</span>
+{"type":"tool_result","tool_use_id":"xxx","content":"File written successfully"}
+
+<span style="color:#6a9955;">// 4. 最终结果</span>
+{"type":"result","subtype":"success","result":"任务完成...","cost_usd":0.05}
+      </pre>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>错误处理策略</h3>
+  <div class="mockup">
+    <div class="mockup-header">Error Handling</div>
+    <div class="mockup-body" style="padding: 24px; background: #1a1a2e; color: #e0e0e0; font-family: monospace; font-size: 13px; line-height: 1.6;">
+      <pre style="margin:0;">
+┌──────────────────┬──────────────────────────────────────┐
+│ 场景              │ 处理策略                              │
+├──────────────────┼──────────────────────────────────────┤
+│ Agent 超时(300s) │ SIGTERM → 等待5s → SIGKILL           │
+│                  │ 标记 phase:failed，可重试              │
+├──────────────────┼──────────────────────────────────────┤
+│ CLI 进程崩溃      │ 捕获非零退出码                        │
+│                  │ 自动重试 1 次，仍失败则 phase:failed    │
+├──────────────────┼──────────────────────────────────────┤
+│ 输出文件缺失      │ 检查 expected outputs                 │
+│                  │ 记录警告，phase 标记为 completed(warn)  │
+├──────────────────┼──────────────────────────────────────┤
+│ API 限流          │ 信号量排队等待                         │
+│                  │ 超出上限返回 429 给用户                 │
+├──────────────────┼──────────────────────────────────────┤
+│ Supervisor 重启   │ 扫描 vault/sessions/ 中 running 状态   │
+│                  │ 标记为 interrupted，用户可手动恢复       │
+└──────────────────┴──────────────────────────────────────┘
+      </pre>
+    </div>
+  </div>
+</div>
