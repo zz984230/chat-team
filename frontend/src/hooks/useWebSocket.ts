@@ -1,12 +1,21 @@
 // src/hooks/useWebSocket.ts
 import { useEffect, useRef, useCallback } from 'react';
-import type { WsEvent } from '../types';
+import type { WsEvent, SessionStatus } from '../types';
 import { useSessionStore } from '../stores/sessionStore';
 import { useAgentStore } from '../stores/agentStore';
+
+const SESSION_STATUS_MAP: Record<string, SessionStatus> = {
+  'session:started': 'running',
+  'session:completed': 'completed',
+  'session:failed': 'failed',
+  'session:paused': 'paused',
+  'session:cancelled': 'cancelled',
+};
 
 export function useWebSocket(sessionId: string | null) {
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  const mountedRef = useRef(true);
 
   const handleEvent = useCallback((event: WsEvent) => {
     // Route to agent store
@@ -17,7 +26,10 @@ export function useWebSocket(sessionId: string | null) {
     // Route to session store
     if (event.type.startsWith('session:')) {
       if (sessionId) {
-        useSessionStore.getState().setSessionStatus(sessionId, event.type.split(':')[1]!);
+        const status = SESSION_STATUS_MAP[event.type];
+        if (status) {
+          useSessionStore.getState().setSessionStatus(sessionId, status);
+        }
       }
     }
 
@@ -49,17 +61,21 @@ export function useWebSocket(sessionId: string | null) {
       }
     };
 
-    ws.onclose = () => {
-      // Reconnect after 3 seconds
-      reconnectTimerRef.current = setTimeout(connect, 3000);
+    ws.onclose = (e) => {
+      // Only reconnect on abnormal close, not normal (1000) or going-away (1001)
+      if (e.code !== 1000 && e.code !== 1001 && mountedRef.current) {
+        reconnectTimerRef.current = setTimeout(connect, 3000);
+      }
     };
 
     wsRef.current = ws;
   }, [sessionId, handleEvent]);
 
   useEffect(() => {
+    mountedRef.current = true;
     connect();
     return () => {
+      mountedRef.current = false;
       clearTimeout(reconnectTimerRef.current);
       wsRef.current?.close();
     };

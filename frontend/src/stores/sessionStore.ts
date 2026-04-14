@@ -22,13 +22,21 @@ export const useSessionStore = create<SessionState>((set, get) => ({
 
   fetchSessions: async () => {
     set({ loading: true });
-    const sessions = await api.listSessions();
-    set({ sessions, loading: false });
+    try {
+      const sessions = await api.listSessions();
+      set({ sessions, loading: false });
+    } catch {
+      set({ loading: false });
+    }
   },
 
   fetchSession: async (id) => {
-    const session = await api.getSession(id);
-    set({ activeSession: session });
+    try {
+      const session = await api.getSession(id);
+      set({ activeSession: session });
+    } catch {
+      // Session fetch failed, keep existing state
+    }
   },
 
   createSession: async (requirement, mode) => {

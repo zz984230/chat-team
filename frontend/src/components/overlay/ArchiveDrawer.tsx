@@ -44,7 +44,11 @@ export function ArchiveDrawer() {
                       {session.status}
                     </span>
                   </div>
-                  <p className="text-gray-500 text-xs mt-1">{session.input_requirement.slice(0, 60)}...</p>
+                  <p className="text-gray-500 text-xs mt-1">
+                    {(session.input_requirement ?? '').length > 60
+                      ? `${session.input_requirement.slice(0, 60)}...`
+                      : (session.input_requirement ?? '')}
+                  </p>
                   <div className="flex flex-wrap gap-1 mt-2">
                     {session.phases.flatMap((p) => p.outputs).map((f) => (
                       <button
