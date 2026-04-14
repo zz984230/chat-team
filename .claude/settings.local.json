@@ -5,7 +5,12 @@
       "Bash(uv run:*)",
       "Bash(python -m pytest tests/test_ws.py -v)",
       "Bash(pip install:*)",
-      "Bash(python -m pytest -v)"
+      "Bash(python -m pytest -v)",
+      "mcp__plugin_claude-mem_mcp-search__smart_outline",
+      "WebSearch",
+      "Bash(curl -s \"https://raw.githubusercontent.com/a16z-infra/ai-town/main/data/characters.ts\")",
+      "Bash(git add:*)",
+      "Bash(git commit -m ':*)"
     ]
   }
 }
