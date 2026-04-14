@@ -2,7 +2,9 @@ import { Graphics } from '@pixi/react';
 import { useCallback } from 'react';
 import { Text } from '@pixi/text';
 import type { Graphics as PixiGraphics } from '@pixi/graphics';
+import { Rectangle } from '@pixi/math';
 import { ROOMS, MAP_CONFIG } from '../../data/mapConfig';
+import { useUiStore } from '../../stores/uiStore';
 
 export function OfficeMap() {
   const draw = useCallback((g: PixiGraphics) => {
@@ -56,6 +58,51 @@ export function OfficeMap() {
     <>
       <Graphics draw={draw} />
       <Graphics draw={drawLabels} />
+      <RoomInteractionLayer />
     </>
   );
+}
+
+function RoomInteractionLayer() {
+  const openArchive = useUiStore((s) => s.openArchiveDrawer);
+
+  return (
+    <>
+      {ROOMS.map((room) => {
+        if (room.id !== 'archive') return null;
+        const { x, y, width, height } = room.bounds;
+        return (
+          <InteractiveRoom
+            key={room.id}
+            x={x * MAP_CONFIG.tileWidth}
+            y={y * MAP_CONFIG.tileHeight}
+            width={width * MAP_CONFIG.tileWidth}
+            height={height * MAP_CONFIG.tileHeight}
+            onClick={openArchive}
+          />
+        );
+      })}
+    </>
+  );
+}
+
+function InteractiveRoom({
+  x, y, width, height, onClick,
+}: {
+  x: number; y: number; width: number; height: number;
+  onClick: () => void;
+}) {
+  const draw = useCallback(
+    (g: PixiGraphics) => {
+      g.clear();
+      g.beginFill(0xffffff, 0.01);
+      g.drawRect(0, 0, width, height);
+      g.endFill();
+      g.hitArea = new Rectangle(0, 0, width, height);
+      g.cursor = 'pointer';
+    },
+    [width, height],
+  );
+
+  return <Graphics draw={draw} x={x} y={y} interactive pointerdown={onClick} />;
 }
