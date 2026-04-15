@@ -4,9 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 项目概述
 
-AgentOffice 是一个多智能体协作系统，通过编排 Claude CLI 子进程来分析需求并生成结构化文档。采用 **Supervisor 单体架构**，FastAPI 后端管理智能体生命周期和工作流。
+AgentOffice 是一个多智能体协作系统，通过编排 Claude CLI 子进程来分析需求并生成结构化文档。采用 **Supervisor 单体架构**，FastAPI 后端管理智能体生命周期和工作流，React 前端提供基于 PixiJS 的可视化办公场景界面。
 
 ## 常用命令
+
+### 后端
 
 ```bash
 # 安装依赖
@@ -25,31 +27,98 @@ cd backend && uv run pytest tests/test_parser.py
 cd backend && uv run pytest tests/test_pool.py::test_submit_success -v
 ```
 
-测试使用 `pytest-asyncio`，`asyncio_mode = "auto"`，async 测试函数无需额外标记。
+### 前端
+
+```bash
+# 安装依赖
+cd frontend && npm install
+
+# 启动开发服务器（端口 3000，自动代理 /api 到后端 8000）
+cd frontend && npm run dev
+
+# 构建
+cd frontend && npm run build
+
+# 运行测试
+cd frontend && npm run test
+```
+
+后端测试使用 `pytest-asyncio`，`asyncio_mode = "auto"`，async 测试函数无需额外标记。
 
 ## 架构
 
-### 请求流
+### 系统总览
 
 ```
-Client → FastAPI (/api/sessions, /api/agents) → WorkflowEngine → AgentPool → AgentRunner → claude -p (子进程)
-                                                                          ↕
-                                                                     VaultManager (文件 I/O)
-                                                                          ↕
-                                                                     WebSocketManager (实时事件)
+┌─────────────────────────────────────────────────────┐
+│  Frontend (React + PixiJS + TailwindCSS)            │
+│  ┌──────────────┐  ┌──────────────────────────────┐ │
+│  │  PixiJS Canvas│  │  HTML Overlay (Zustand 状态) │ │
+│  │  (OfficeMap,  │  │  (StatusBar, AgentDetail,    │ │
+│  │   AgentSprite)│  │   DocViewer, ArchiveDrawer)  │ │
+│  └──────┬───────┘  └──────────────┬───────────────┘ │
+│         └────────────┬────────────┘                  │
+│              API + WebSocket                         │
+└──────────────────────┬──────────────────────────────┘
+                       │
+┌──────────────────────┴──────────────────────────────┐
+│  Backend (FastAPI)                                   │
+│  Client → API Router → WorkflowEngine → AgentPool    │
+│  → AgentRunner → claude -p (子进程)                  │
+│        ↕                    ↕                        │
+│  VaultManager (文件 I/O)  WebSocketManager (实时事件) │
+└─────────────────────────────────────────────────────┘
 ```
 
-### 核心组件（均在 `backend/app/` 下）
+### 后端核心组件（`backend/app/`）
 
 - **`workflow/engine.py`** — 中央编排器。管理 session 生命周期，按阶段执行工作流。两种模式：
   - `default`：3 阶段流水线 — analyst → (architect + researcher 并行) → writer
   - `brainstorm`：N 轮并行讨论，最后由 writer 综合输出
+- **`workflow/models.py`** — 数据模型（SessionStatus、PhaseStatus、AgentDefinition 等 Pydantic 模型）
 - **`agent/runner.py`** — 封装单个 `claude -p --output-format stream-json` 子进程。处理 prepare/execute/collect/cleanup 完整生命周期。
 - **`agent/pool.py`** — 基于信号量的并发限制器，含超时和重试逻辑。
 - **`agent/parser.py`** — 将 Claude CLI 的 NDJSON 流解析为类型化的 `StreamEvent` 对象。
 - **`vault/manager.py`** — 基于文件的持久化。Session 是 `vault/sessions/<id>/` 下的目录，包含 `meta.yaml` 和智能体输出的 markdown 文件。
 - **`ws/manager.py`** — WebSocket 广播器，推送 session 事件（阶段开始/完成等）。
+- **`api/sessions.py`** — Session 相关 REST 端点和 WebSocket 端点。
+- **`api/agents.py`** — Agent 定义查询端点。
+- **`config.py`** — Pydantic 配置模型，从 `settings.yaml` 加载。
 - **`dependencies.py`** — 应用启动时组装 VaultManager → AgentPool → WebSocketManager → WorkflowEngine。
+
+### 前端核心组件（`frontend/src/`）
+
+**Canvas 层**（`components/canvas/`）：
+- **`PixiCanvas.tsx`** — 全屏 PixiJS 舞台，响应式尺寸
+- **`OfficeMap.tsx`** — 办公室地图渲染（走廊、房间、墙壁、标签），支持点击交互
+- **`AgentSprite.tsx`** — 智能体精灵（彩色圆点），支持 idle/walking/working/thinking 动画状态
+
+**Overlay 层**（`components/overlay/`）：
+- **`NewTaskModal.tsx`** — 新建任务提交界面
+- **`StatusBar.tsx`** — 底部状态栏（session 状态、阶段进度、操作按钮）
+- **`AgentDetailPanel.tsx`** — 右侧面板（智能体详情、思考内容、工具使用、输出文件）
+- **`DocViewer.tsx`** — 文档查看器（markdown 渲染）
+- **`ArchiveDrawer.tsx`** — 历史会话抽屉（浏览/加载历史 session）
+
+**UI 组件**（`components/ui/`）：
+- **`Modal.tsx`** — 可复用模态框（支持 ESC 关闭）
+
+**状态管理**（`stores/`）：
+- **`agentStore.ts`** — 智能体视觉状态（动画、思考内容、工具使用、输出文件）
+- **`sessionStore.ts`** — Session 数据和生命周期管理，集成 API 调用
+- **`uiStore.ts`** — UI 组件可见性控制
+
+**Hooks**（`hooks/`）：
+- **`useWebSocket.ts`** — WebSocket 连接管理，自动重连，事件分发到 store
+- **`useSession.ts`** — Session 列表加载
+
+**配置数据**（`data/`）：
+- **`agentConfig.ts`** — 4 个智能体的视觉属性和房间位置
+- **`mapConfig.ts`** — 办公室布局（4 个房间：meeting、design、writing、archive）
+- **`spritesheets/`** — 精灵帧动画定义
+
+**服务**（`services/`）：
+- **`api.ts`** — 基于 ky 的 HTTP 客户端，封装所有后端 API 调用
 
 ### 智能体定义
 
@@ -69,6 +138,8 @@ Client → FastAPI (/api/sessions, /api/agents) → WorkflowEngine → AgentPool
 
 `backend/settings.yaml` 控制服务器、智能体池、vault 路径和工作流设置。通过 `app/config.py` 加载为 pydantic 模型。
 
+前端 Vite 开发服务器端口 3000，自动将 `/api` 请求代理到后端 `http://localhost:8000`（含 WebSocket）。
+
 ### 数据流
 
 1. 客户端 POST 需求 → `WorkflowEngine` 创建 `Session`，分配各阶段的 `AgentDefinition`
@@ -76,9 +147,47 @@ Client → FastAPI (/api/sessions, /api/agents) → WorkflowEngine → AgentPool
 3. 智能体输出（markdown 文件）从工作目录收集到 session 目录（通过 `VaultManager`）
 4. 后续阶段接收前序阶段的输出文件作为输入上下文
 5. 每个阶段转换时通过 WebSocket 推送事件
+6. 前端通过 `useWebSocket` hook 接收事件，更新 `agentStore` 和 `sessionStore`，驱动 Canvas 和 Overlay 刷新
+
+## 技术栈
+
+| 层级 | 后端 | 前端 |
+|------|------|------|
+| 框架 | FastAPI + Uvicorn | React 18 + TypeScript |
+| 构建 | uv + pyproject.toml | Vite |
+| 样式 | — | TailwindCSS |
+| 状态 | Pydantic 模型 | Zustand |
+| 实时 | WebSocket | WebSocket + EventSource |
+| HTTP | FastAPI 路由 | ky |
+| 测试 | pytest + pytest-asyncio + httpx | Vitest + Testing Library |
+| 可视化 | — | PixiJS + pixi-viewport |
+
+## 测试结构
+
+### 后端（`backend/tests/`）
+
+- `conftest.py` — 共享 fixtures（临时 vault、临时 settings）
+- `test_api.py` — FastAPI 端点测试
+- `test_workflow.py` — WorkflowEngine 测试
+- `test_vault.py` — VaultManager 测试
+- `test_agent_runner.py` — AgentRunner 测试
+- `test_pool.py` — AgentPool 测试
+- `test_parser.py` — 流解析器测试
+- `test_models.py` — Pydantic 模型验证
+- `test_session_control.py` — Session 暂停/恢复/取消
+- `test_integration.py` — 端到端集成测试
+- `test_ws.py` — WebSocket 测试
+- `test_config.py` — 配置加载测试
+
+### 前端（`frontend/tests/`）
+
+- 使用 Vitest + jsdom 环境
+- `npm run test` 或 `npm run test:watch`
 
 ## 关键设计决策
 
 - 智能体以 `claude -p` 子进程方式运行，而非 SDK 调用 — 系统与 Claude CLI 的 `stream-json` 输出格式耦合
 - 状态持久化基于文件（vault 目录中的 YAML + markdown），不使用数据库
 - Engine 依赖注入使用模块级全局变量（在应用启动时设置），而非 FastAPI 的依赖注入系统
+- 前端采用双层渲染架构：PixiJS Canvas 处理性能敏感的可视化，HTML Overlay 处理 UI 交互
+- 前端 API 通过 Vite proxy 统一代理到后端，避免跨域问题
