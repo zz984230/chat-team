@@ -6,5 +6,8 @@ docs/superpowers/.DS_Store
 
 node_modules/
 
+# Build output
+frontend/dist/
+
 # Runtime data
 backend/vault/sessions/

@@ -18,7 +18,8 @@
       "Bash(npx tsc:*)",
       "Bash(git:*)",
       "Bash(npx vitest:*)",
-      "Bash(timeout 8 npm run dev)"
+      "Bash(timeout 8 npm run dev)",
+      "Bash(npm run:*)"
     ]
   }
 }
