@@ -32,6 +32,9 @@ function ViewportLayer({ app, children }: { app: Application; children?: ReactNo
   const [viewport, setViewport] = useState<Viewport | null>(null);
 
   useEffect(() => {
+    // StrictMode 双重挂载时 renderer 可能已被 destroy，需守卫
+    if (!app.renderer) return;
+
     const worldWidth = MAP_CONFIG.mapWidth * MAP_CONFIG.tileWidth;
     const worldHeight = MAP_CONFIG.mapHeight * MAP_CONFIG.tileHeight;
 
