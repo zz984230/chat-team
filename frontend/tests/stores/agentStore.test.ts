@@ -33,4 +33,35 @@ describe('agentStore', () => {
     const agent = useAgentStore.getState().agents['analyst'];
     expect(agent?.outputFiles).toContain('01-需求澄清.md');
   });
+
+  it('initializes new spatial fields with defaults', () => {
+    useAgentStore.getState().handleEvent({ type: 'agent:thinking', agent_id: 'analyst', content: 'test' });
+    const agent = useAgentStore.getState().agents['analyst'];
+    expect(agent?.direction).toBe('down');
+    expect(agent?.targetPosition).toBeNull();
+    expect(agent?.room).toBeNull();
+  });
+
+  it('resets spatial fields when agent completes', () => {
+    useAgentStore.setState({
+      agents: {
+        analyst: {
+          animationState: 'working' as const,
+          thinkingContent: null,
+          currentTool: 'Write',
+          outputFiles: [],
+          lastDurationMs: null,
+          errorMessage: null,
+          direction: 'up' as const,
+          targetPosition: { x: 10, y: 10 },
+          room: 'meeting',
+        },
+      },
+    });
+
+    useAgentStore.getState().handleEvent({ type: 'agent:completed', agent_id: 'analyst', duration_ms: 5000 });
+    const agent = useAgentStore.getState().agents['analyst'];
+    expect(agent?.animationState).toBe('idle');
+    expect(agent?.targetPosition).toBeNull();
+  });
 });

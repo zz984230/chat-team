@@ -72,3 +72,5 @@ export interface WsEvent {
 
 // Agent visual state
 export type AgentAnimationState = 'idle' | 'walking' | 'working' | 'thinking';
+
+export type AgentDirection = 'down' | 'up' | 'left' | 'right';

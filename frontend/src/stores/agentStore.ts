@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { AgentAnimationState, WsEvent } from '../types';
+import type { AgentAnimationState, AgentDirection, WsEvent } from '../types';
 
 interface AgentVisualState {
   animationState: AgentAnimationState;
@@ -8,6 +8,9 @@ interface AgentVisualState {
   outputFiles: string[];
   lastDurationMs: number | null;
   errorMessage: string | null;
+  direction: AgentDirection;
+  targetPosition: { x: number; y: number } | null;
+  room: string | null;
 }
 
 interface AgentState {
@@ -25,6 +28,9 @@ const defaultAgentState = (): AgentVisualState => ({
   outputFiles: [],
   lastDurationMs: null,
   errorMessage: null,
+  direction: 'down',
+  targetPosition: null,
+  room: null,
 });
 
 export const useAgentStore = create<AgentState>((set) => ({
@@ -88,6 +94,7 @@ export const useAgentStore = create<AgentState>((set) => ({
               lastDurationMs: event.duration_ms ?? null,
               thinkingContent: null,
               currentTool: null,
+              targetPosition: null,
             },
           },
         }));
