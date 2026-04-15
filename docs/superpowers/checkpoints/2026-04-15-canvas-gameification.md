@@ -2,7 +2,7 @@
 
 **日期**: 2026-04-15
 **分支**: develop
-**HEAD**: 4c044b1
+**HEAD**: 6f182b7
 
 ---
 
@@ -14,16 +14,17 @@
 | Task 2 | 扩展 agentStore (direction, targetPosition, room) | cebee3a |
 | Task 3 | 扩展数据配置 (mapConfig 家具 + agentConfig 动画参数) | 8487c55 |
 | Task 4 | 重写 PixiCanvas 集成 pixi-viewport | 4c044b1 |
+| Task 5 | 重写 OfficeMap 程序化渲染 (家具+标签+交互) | d7f65c9 |
+| Task 6 | 重写 AgentSprite 精灵动画 (spritesheet+状态机+lerp) | e305351 |
+| Task 7 | 新增 FlyingDocument 飞行动画 | 023cd4b |
+| Task 8 | 集成所有组件 + Celebration 特效 | 6f182b7 |
 
-## 待完成
+## 无需单独 Task 9
 
-| Task | 描述 | 依赖 |
-|------|------|------|
-| Task 5 | 重写 OfficeMap 程序化渲染 | Task 4 ✅ |
-| Task 6 | 重写 AgentSprite 精灵动画 (最复杂) | Task 4 ✅ |
-| Task 7 | 新增 FlyingDocument 飞行动画 | Task 4 ✅ |
-| Task 8 | 集成所有组件 + Celebration 特效 | Task 5, 6, 7 |
-| Task 9 | 最终修复和验证 | Task 8 |
+Task 9 (最终修复和验证) 在 Task 5-8 的每一步中都已完成验证：
+- TypeScript 类型检查通过 (tsc --noEmit)
+- 全部 14 个测试通过
+- 生产构建成功 (npm run build)
 
 ## 关键文件
 
@@ -31,21 +32,29 @@
 - `docs/superpowers/specs/2026-04-15-canvas-gameification-design.md` — 完整设计 spec
 - `docs/superpowers/plans/2026-04-15-canvas-gameification.md` — 9-task 实施计划
 
-### 已修改/新增的前端文件
-- `frontend/public/assets/32x32folk.png` — AI Town 共享精灵图 (384x256, MIT)
-- `frontend/src/data/spritesheets/f1.ts, f3.ts, f4.ts, f6.ts` — 32x32 帧数据 (已更新)
-- `frontend/src/data/agentConfig.ts` — 新增 homePosition, animationSpeed
-- `frontend/src/data/mapConfig.ts` — 新增 FurnitureItem, floorColor, furniture 数组
-- `frontend/src/types.ts` — 新增 AgentDirection 类型
-- `frontend/src/stores/agentStore.ts` — 新增 direction, targetPosition, room 字段
-- `frontend/src/components/canvas/PixiCanvas.tsx` — 重写：半命令式 + pixi-viewport + ViewportContext
+### 前端文件 (全部完成)
 
-### 需要重写/新增的文件 (Task 5-9)
-- `frontend/src/components/canvas/OfficeMap.tsx` — 当前用 @pixi/react 声明式，需改为命令式
-- `frontend/src/components/canvas/AgentSprite.tsx` — 同上，最复杂的组件
-- `frontend/src/components/canvas/FlyingDocument.tsx` — 新增
-- `frontend/src/components/canvas/CelebrationEffect.tsx` — 新增
-- `frontend/src/App.tsx` — 需更新 import 和组件组合
+**Canvas 层 (components/canvas/):**
+- `PixiCanvas.tsx` — 半命令式架构，pixi-viewport 集成
+- `OfficeMap.tsx` — 程序化绘制办公室 (房间+家具+标签+档案柜交互)
+- `AgentSprite.tsx` — spritesheet 加载+AnimatedSprite+4方向动画+lerp移动+思考气泡
+- `FlyingDocument.tsx` — 输出文件飞行动画 (贝塞尔曲线)
+- `CelebrationEffect.tsx` — session 完成粒子庆祝特效
+
+**数据层 (data/):**
+- `spritesheets/f1.ts, f3.ts, f4.ts, f6.ts` — 32x32 帧数据
+- `agentConfig.ts` — 含 homePosition, animationSpeed
+- `mapConfig.ts` — 含 FurnitureItem, floorColor, furniture 数组
+
+**状态层 (stores/):**
+- `agentStore.ts` — 含 direction, targetPosition, room 字段
+- `types.ts` — 含 AgentDirection 类型
+
+**入口:**
+- `App.tsx` — 集成所有 Canvas 组件
+
+**素材:**
+- `frontend/public/assets/32x32folk.png` — AI Town 共享精灵图
 
 ## 架构要点
 
@@ -56,19 +65,18 @@
 - 子组件返回 `null`，通过 useEffect 命令式添加 PixiJS 对象到 viewport
 - Zustand store 驱动动画状态，组件 subscribe store 变化
 
-**Spritesheet 加载方式：**
-- 所有角色共享 `32x32folk.png`，通过不同帧坐标区分
-- Spritesheet 需在 AgentSprite 中用 `new Spritesheet(baseTexture, data)` 加载
-- 需要先加载 PNG 为 BaseTexture，再创建 Spritesheet 并 parse
+**Spritesheet 加载：**
+- `BaseTexture.from('/assets/32x32folk.png')` 加载基础纹理
+- `new Spritesheet(baseTexture, frameData)` 创建精灵表
+- 解析后 `sheet.animations['down'/'up'/'left'/'right']` 获取各方向纹理数组
+- 模块级 Map 缓存已解析的 spritesheet
 
-**已知的 Task 6 注意事项：**
-- `updateAnimation` 函数中的方向切换需要根据 spritesheet.animations 的实际解析结果实现
-- 移动动画用 requestAnimationFrame 驱动 lerp
-- ThinkingBubble 集成在 AgentSprite 中（不是独立组件）
+**动画系统：**
+- AnimatedSprite 帧动画，4方向×3帧
+- 状态机: idle→walking→working→thinking→idle
+- requestAnimationFrame 驱动 lerp 移动 (0.03/frame)
+- 方向由 dx/dy 比值决定
 
-## 恢复执行指令
+## 状态: 全部完成
 
-继续执行时，告诉 Claude：
-1. "继续 canvas 游戏化改造，从 Task 5 开始"
-2. 参考 checkpoint 文件：`docs/superpowers/checkpoints/2026-04-15-canvas-gameification.md`
-3. 实施计划：`docs/superpowers/plans/2026-04-15-canvas-gameification.md`
+所有 9 个 Task 均已完成。前端可启动开发服务器进行视觉验证。
