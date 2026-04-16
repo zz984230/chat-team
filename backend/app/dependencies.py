@@ -33,4 +33,5 @@ def create_engine(settings: Settings) -> WorkflowEngine:
         pool=pool,
         ws_manager=ws_manager,
         work_dir=settings.agent.work_dir,
+        api_key=settings.agent.api_key,
     )

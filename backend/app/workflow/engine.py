@@ -22,11 +22,13 @@ class WorkflowEngine:
         pool: AgentPool,
         ws_manager: WebSocketManager,
         work_dir: str = "/tmp/agentoffice",
+        api_key: str = "",
     ):
         self.vault_manager = vault_manager
         self.pool = pool
         self.ws_manager = ws_manager
         self.work_dir = work_dir
+        self.api_key = api_key
         self._agent_defs: dict[str, AgentDefinition] = {}
         self._load_agent_defs()
 
@@ -68,6 +70,8 @@ class WorkflowEngine:
 
             session.status = SessionStatus.COMPLETED
         except Exception as e:
+            import logging
+            logging.getLogger(__name__).exception("Session %s failed", session_id)
             session.status = SessionStatus.FAILED
             await self.ws_manager.emit(session_id, "session:failed", error=str(e))
         finally:
@@ -131,6 +135,7 @@ class WorkflowEngine:
             work_dir=Path(f"{self.work_dir}/{session.id}/{agent_id}"),
             session_dir=session_dir,
             input_files=list(session_dir.glob("*.md")),
+            api_key=self.api_key,
         )
         runner = AgentRunner(agent_def, config)
 
@@ -163,6 +168,7 @@ class WorkflowEngine:
                 work_dir=Path(f"{self.work_dir}/{session.id}/{agent_id}"),
                 session_dir=session_dir,
                 input_files=list(session_dir.glob("*.md")),
+                api_key=self.api_key,
             )
             runner = AgentRunner(agent_def, config)
             return await self.pool.submit(runner, task)
@@ -172,11 +178,18 @@ class WorkflowEngine:
             return_exceptions=True,
         )
 
+        success_count = 0
         for r in results:
             if isinstance(r, AgentResult):
                 phase.outputs.extend(r.output_files)
+                if r.success:
+                    success_count += 1
 
-        phase.status = PhaseStatus.COMPLETED
+        if success_count == 0:
+            errors = [str(r) for r in results if isinstance(r, Exception)]
+            phase.status = PhaseStatus.FAILED
+        else:
+            phase.status = PhaseStatus.COMPLETED
         phase.completed_at = datetime.now()
         self.vault_manager.update_session(session)
 

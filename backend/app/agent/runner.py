@@ -17,6 +17,7 @@ class AgentRunConfig(BaseModel):
     session_dir: Path
     input_files: list[Path] = []
     timeout_seconds: int = 300
+    api_key: str = ""
 
 
 class AgentRunner:
@@ -54,14 +55,21 @@ class AgentRunner:
         cmd = [
             "claude", "-p", prompt,
             "--output-format", "stream-json",
+            "--verbose",
             "--max-turns", str(self.agent_def.max_turns),
         ]
+
+        env = None
+        if self.config.api_key:
+            import os
+            env = {**os.environ, "ANTHROPIC_API_KEY": self.config.api_key}
 
         self._process = await asyncio.create_subprocess_exec(
             *cmd,
             cwd=str(self.config.work_dir),
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
+            env=env,
         )
 
         events: list[StreamEvent] = []
@@ -113,15 +121,27 @@ class AgentRunner:
             events = await self.execute(task, event_callback)
             output_files = await self.collect_outputs()
 
+            # Capture stderr for diagnostics if process failed
+            stderr_info = ""
+            if self._process and self._process.returncode != 0 and self._process.stderr:
+                stderr_bytes = await self._process.stderr.read()
+                stderr_info = stderr_bytes.decode("utf-8", errors="replace").strip()
+
             # Check result
             final = next((e for e in reversed(events) if e.type in ("completed", "failed")), None)
             success = final is not None and final.type == "completed"
+
+            error_msg = None
+            if not success:
+                error_msg = final.error if final and final.type == "failed" else None
+                if stderr_info:
+                    error_msg = f"{error_msg or 'Process exited with non-zero code'}\nstderr: {stderr_info}"
 
             return AgentResult(
                 agent_id=self.agent_def.id,
                 success=success,
                 output_files=output_files,
-                error=final.error if final and final.type == "failed" else None,
+                error=error_msg,
                 duration_ms=int((time.monotonic() - start) * 1000),
             )
         except Exception as e:

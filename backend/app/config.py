@@ -15,6 +15,7 @@ class AgentConfig(BaseModel):
     timeout_seconds: int = 300
     retry_count: int = 1
     work_dir: str = "/tmp/agentoffice"
+    api_key: str = ""
 
 
 class VaultConfig(BaseModel):
