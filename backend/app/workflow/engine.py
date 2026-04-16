@@ -30,6 +30,7 @@ class WorkflowEngine:
         self.work_dir = work_dir
         self.api_key = api_key
         self._agent_defs: dict[str, AgentDefinition] = {}
+        self._sessions: dict[str, Session] = {}
         self._load_agent_defs()
 
     def _load_agent_defs(self) -> None:
@@ -48,18 +49,21 @@ class WorkflowEngine:
         import uuid
         return datetime.now().strftime("%Y%m%d-%H%M%S") + f"-{uuid.uuid4().hex[:6]}"
 
-    async def start_session(self, req: CreateSessionRequest) -> Session:
-        """Create and execute a new workflow session."""
+    def create_session(self, req: CreateSessionRequest) -> Session:
+        """Create a new session (sync, returns immediately)."""
         session_id = self._generate_session_id()
         session = Session.from_request(req, session_id)
         session.status = SessionStatus.RUNNING
         session.updated_at = datetime.now()
+        self._sessions[session_id] = session
 
-        # Create session in vault
         self.vault_manager.create_session(session)
         self.vault_manager.update_session(session)
+        return session
 
-        # Notify
+    async def execute_session(self, session: Session) -> Session:
+        """Execute a previously created session (async, runs in background)."""
+        session_id = session.id
         await self.ws_manager.emit(session_id, "session:started")
 
         try:
@@ -198,9 +202,11 @@ class WorkflowEngine:
         )
 
     def get_session(self, session_id: str) -> Session | None:
-        """Get session by ID."""
-        return self.vault_manager.get_session(session_id)
+        """Get session by ID (prefers in-memory for live state)."""
+        return self._sessions.get(session_id) or self.vault_manager.get_session(session_id)
 
     def list_sessions(self) -> list[Session]:
-        """List all sessions."""
-        return self.vault_manager.list_sessions()
+        """List all sessions (merges in-memory and vault)."""
+        vault_sessions = {s.id: s for s in self.vault_manager.list_sessions()}
+        vault_sessions.update(self._sessions)
+        return list(vault_sessions.values())

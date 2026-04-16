@@ -1,4 +1,5 @@
 # backend/app/api/sessions.py
+import asyncio
 from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
 
 from app.workflow.models import CreateSessionRequest, SessionStatus
@@ -21,7 +22,8 @@ def set_engine(engine: WorkflowEngine) -> None:
 @router.post("/sessions", status_code=201)
 async def create_session(req: CreateSessionRequest):
     assert _engine is not None
-    session = await _engine.start_session(req)
+    session = _engine.create_session(req)
+    asyncio.create_task(_engine.execute_session(session))
     return session.model_dump(mode="json")
 
 

@@ -39,7 +39,7 @@ def engine(tmp_vault: Path) -> WorkflowEngine:
 
 @pytest.mark.asyncio
 async def test_start_session_creates_and_runs(engine: WorkflowEngine):
-    """start_session creates session in vault and begins execution."""
+    """create_session + execute_session creates session in vault and runs it."""
     req = CreateSessionRequest(requirement="test requirement")
 
     # Mock pool to return success
@@ -47,9 +47,11 @@ async def test_start_session_creates_and_runs(engine: WorkflowEngine):
         agent_id="analyst", success=True, output_files=["01-需求澄清.md"], duration_ms=1000,
     ))
 
-    session = await engine.start_session(req)
+    session = engine.create_session(req)
     assert session.id  # session_id was generated
     assert session.input_requirement == "test requirement"
+    session = await engine.execute_session(session)
+    assert session.status == SessionStatus.COMPLETED
 
 
 @pytest.mark.asyncio
@@ -61,7 +63,8 @@ async def test_run_default_workflow_phases(engine: WorkflowEngine):
         agent_id="agent", success=True, output_files=["out.md"], duration_ms=100,
     ))
 
-    session = await engine.start_session(req)
+    session = engine.create_session(req)
+    await engine.execute_session(session)
 
     # Should have called pool.submit once per agent (4 total: analyst + architect + researcher + writer)
     assert engine.pool.submit.call_count == 4
@@ -84,7 +87,8 @@ async def test_phase_2_runs_parallel(engine: WorkflowEngine):
 
     engine.pool.submit = track_submit
 
-    await engine.start_session(req)
+    session = engine.create_session(req)
+    await engine.execute_session(session)
 
     # Phase 2 agents should overlap (not strictly sequential)
     # Both should appear before writer
@@ -98,7 +102,8 @@ async def test_phase_2_runs_parallel(engine: WorkflowEngine):
 async def test_pause_and_resume(engine: WorkflowEngine):
     """Can pause and resume a session."""
     req = CreateSessionRequest(requirement="test")
-    session = await engine.start_session(req)
+    session = engine.create_session(req)
+    await engine.execute_session(session)
 
     # For this test, just verify session state transitions
     loaded = engine.vault_manager.get_session(session.id)
@@ -107,9 +112,10 @@ async def test_pause_and_resume(engine: WorkflowEngine):
 
 @pytest.mark.asyncio
 async def test_get_session(engine: WorkflowEngine):
-    """get_session returns session from vault."""
+    """get_session returns session from memory or vault."""
     req = CreateSessionRequest(requirement="test")
-    created = await engine.start_session(req)
+    created = engine.create_session(req)
+    await engine.execute_session(created)
 
     loaded = engine.get_session(created.id)
     assert loaded is not None
@@ -123,8 +129,10 @@ async def test_list_sessions(engine: WorkflowEngine):
         agent_id="a", success=True, output_files=["out.md"], duration_ms=10,
     ))
 
-    await engine.start_session(CreateSessionRequest(requirement="test1"))
-    await engine.start_session(CreateSessionRequest(requirement="test2"))
+    s1 = engine.create_session(CreateSessionRequest(requirement="test1"))
+    await engine.execute_session(s1)
+    s2 = engine.create_session(CreateSessionRequest(requirement="test2"))
+    await engine.execute_session(s2)
 
     sessions = engine.list_sessions()
     assert len(sessions) == 2
