@@ -34,7 +34,7 @@ export function ArchiveDrawer() {
                   }}
                 >
                   <div className="flex items-center justify-between">
-                    <span className="text-gray-300 text-sm font-mono">{session.id.slice(0, 18)}</span>
+                    <span className="text-gray-300 text-sm font-mono">{session.id}</span>
                     <span className={`text-xs px-2 py-0.5 rounded ${
                       session.status === 'completed' ? 'bg-green-900 text-green-400' :
                       session.status === 'running' ? 'bg-blue-900 text-blue-400' :

@@ -51,9 +51,11 @@ class AgentRunner:
 
     async def execute(self, task: str, event_callback=None) -> list[StreamEvent]:
         """Execute claude -p and stream events."""
+        import sys
         prompt = self.build_prompt(task)
+        claude_cmd = "claude.cmd" if sys.platform == "win32" else "claude"
         cmd = [
-            "claude", "-p", prompt,
+            claude_cmd, "-p", prompt,
             "--output-format", "stream-json",
             "--verbose",
             "--max-turns", str(self.agent_def.max_turns),

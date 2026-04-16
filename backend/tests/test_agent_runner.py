@@ -32,14 +32,14 @@ async def test_prepare_creates_work_dir(analyst_def: AgentDefinition, run_config
     # Create an input file
     run_config.session_dir.mkdir(parents=True, exist_ok=True)
     input_file = run_config.session_dir / "00-原始需求.md"
-    input_file.write_text("test requirement")
+    input_file.write_text("test requirement", encoding="utf-8")
     run_config.input_files = [input_file]
 
     runner = AgentRunner(analyst_def, run_config)
     await runner.prepare()
 
     assert run_config.work_dir.is_dir()
-    assert (run_config.work_dir / "00-原始需求.md").read_text() == "test requirement"
+    assert (run_config.work_dir / "00-原始需求.md").read_text(encoding="utf-8") == "test requirement"
 
 
 @pytest.mark.asyncio
@@ -58,20 +58,20 @@ async def test_collect_outputs(analyst_def: AgentDefinition, run_config: AgentRu
     """collect_outputs() copies output files from work dir to session dir."""
     run_config.work_dir.mkdir(parents=True, exist_ok=True)
     run_config.session_dir.mkdir(parents=True, exist_ok=True)
-    (run_config.work_dir / "01-需求澄清.md").write_text("# 澄清结果")
+    (run_config.work_dir / "01-需求澄清.md").write_text("# 澄清结果", encoding="utf-8")
 
     runner = AgentRunner(analyst_def, run_config)
     output_files = await runner.collect_outputs()
 
     assert "01-需求澄清.md" in output_files
-    assert (run_config.session_dir / "01-需求澄清.md").read_text() == "# 澄清结果"
+    assert (run_config.session_dir / "01-需求澄清.md").read_text(encoding="utf-8") == "# 澄清结果"
 
 
 @pytest.mark.asyncio
 async def test_cleanup(analyst_def: AgentDefinition, run_config: AgentRunConfig):
     """cleanup() removes work directory."""
     run_config.work_dir.mkdir(parents=True, exist_ok=True)
-    (run_config.work_dir / "temp.txt").write_text("temp")
+    (run_config.work_dir / "temp.txt").write_text("temp", encoding="utf-8")
 
     runner = AgentRunner(analyst_def, run_config)
     await runner.cleanup()

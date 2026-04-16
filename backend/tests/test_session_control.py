@@ -20,7 +20,7 @@ def _create_agent_yamls(agents_dir: Path) -> None:
     ]
     for agent in agents:
         path = agents_dir / f"{agent['id']}.yaml"
-        path.write_text(yaml.dump(agent, allow_unicode=True))
+        path.write_text(yaml.dump(agent, allow_unicode=True), encoding="utf-8")
 
 
 @pytest.fixture

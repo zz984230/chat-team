@@ -18,7 +18,8 @@ def test_load_settings_from_yaml(tmp_path: Path):
     """load_settings reads a YAML file and returns Settings."""
     yaml_file = tmp_path / "settings.yaml"
     yaml_file.write_text(
-        "server:\n  port: 9000\nvault:\n  path: '/data/vault'\n"
+        "server:\n  port: 9000\nvault:\n  path: '/data/vault'\n",
+        encoding="utf-8",
     )
     s = load_settings(yaml_file)
     assert s.server.port == 9000

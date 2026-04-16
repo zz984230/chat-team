@@ -26,7 +26,7 @@ class VaultManager:
         if not self._agents_path.exists():
             return agents
         for f in sorted(self._agents_path.glob("*.yaml")):
-            data = yaml.safe_load(f.read_text())
+            data = yaml.safe_load(f.read_text(encoding="utf-8"))
             if data:
                 agents.append(AgentDefinition(**data))
         return agents
@@ -37,7 +37,7 @@ class VaultManager:
         session_dir.mkdir(parents=True, exist_ok=True)
 
         # Write input requirement
-        (session_dir / "00-原始需求.md").write_text(session.input_requirement)
+        (session_dir / "00-原始需求.md").write_text(session.input_requirement, encoding="utf-8")
 
         # Write meta.yaml
         self._write_meta(session_dir, session)
@@ -49,7 +49,7 @@ class VaultManager:
         meta_path = self._sessions_path / session_id / "meta.yaml"
         if not meta_path.exists():
             return None
-        data = yaml.safe_load(meta_path.read_text())
+        data = yaml.safe_load(meta_path.read_text(encoding="utf-8"))
         return Session(**data) if data else None
 
     def list_sessions(self) -> list[Session]:
@@ -58,7 +58,7 @@ class VaultManager:
         if not self._sessions_path.exists():
             return sessions
         for meta_path in self._sessions_path.glob("*/meta.yaml"):
-            data = yaml.safe_load(meta_path.read_text())
+            data = yaml.safe_load(meta_path.read_text(encoding="utf-8"))
             if data:
                 sessions.append(Session(**data))
         sessions.sort(key=lambda s: s.created_at, reverse=True)
@@ -73,14 +73,14 @@ class VaultManager:
     def save_agent_output(self, session_id: str, filename: str, content: str) -> None:
         """Write agent output file to session directory."""
         output_path = self._sessions_path / session_id / filename
-        output_path.write_text(content)
+        output_path.write_text(content, encoding="utf-8")
 
     def get_output_file(self, session_id: str, filename: str) -> str | None:
         """Read an output file from session directory."""
         path = self._sessions_path / session_id / filename
         if not path.exists():
             return None
-        return path.read_text()
+        return path.read_text(encoding="utf-8")
 
     def list_outputs(self, session_id: str) -> list[str]:
         """List output files (excluding meta.yaml and 00-原始需求.md)."""
@@ -98,5 +98,6 @@ class VaultManager:
         """Serialize session to meta.yaml."""
         meta_path = session_dir / "meta.yaml"
         meta_path.write_text(
-            yaml.dump(session.model_dump(mode="json"), allow_unicode=True, default_flow_style=False)
+            yaml.dump(session.model_dump(mode="json"), allow_unicode=True, default_flow_style=False),
+            encoding="utf-8",
         )

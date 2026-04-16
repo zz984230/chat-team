@@ -23,7 +23,8 @@ def test_load_agent_definitions(tmp_vault: Path):
         "max_turns: 20\n"
         "system_prompt: |\n"
         "  你是一位资深需求分析师。\n"
-        "output_file: 01-需求澄清.md\n"
+        "output_file: 01-需求澄清.md\n",
+        encoding="utf-8",
     )
     vm = VaultManager(tmp_vault)
     agents = vm.load_agent_definitions()
@@ -42,7 +43,7 @@ def test_create_session_dir(tmp_vault: Path):
     session_dir = vm.create_session(session)
     assert session_dir.is_dir()
     assert (session_dir / "00-原始需求.md").exists()
-    assert "设计电商系统" in (session_dir / "00-原始需求.md").read_text()
+    assert "设计电商系统" in (session_dir / "00-原始需求.md").read_text(encoding="utf-8")
     assert (session_dir / "meta.yaml").exists()
 
 
