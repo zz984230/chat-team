@@ -61,10 +61,18 @@ class AgentRunner:
             "--max-turns", str(self.agent_def.max_turns),
         ]
 
-        env = None
+        import os
+        env = dict(os.environ)
+        if sys.platform == "win32":
+            import shutil
+            git_exe = shutil.which("git")
+            if git_exe:
+                git_root = Path(git_exe).parent.parent.parent
+                git_bash = git_root / "bin" / "bash.exe"
+                if git_bash.exists():
+                    env["CLAUDE_CODE_GIT_BASH_PATH"] = str(git_bash)
         if self.config.api_key:
-            import os
-            env = {**os.environ, "ANTHROPIC_API_KEY": self.config.api_key}
+            env["ANTHROPIC_API_KEY"] = self.config.api_key
 
         self._process = await asyncio.create_subprocess_exec(
             *cmd,
