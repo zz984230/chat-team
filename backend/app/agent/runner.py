@@ -1,5 +1,7 @@
 import asyncio
 import shutil
+import subprocess
+import sys
 import time
 from pathlib import Path
 
@@ -26,7 +28,8 @@ class AgentRunner:
     def __init__(self, agent_def: AgentDefinition, config: AgentRunConfig):
         self.agent_def = agent_def
         self.config = config
-        self._process: asyncio.subprocess.Process | None = None
+        self._returncode: int | None = None
+        self._stderr: str = ""
 
     async def prepare(self) -> None:
         """Create work directory and copy input files."""
@@ -49,13 +52,33 @@ class AgentRunner:
         parts.append(f"\n\n## 任务\n{task}")
         return "".join(parts)
 
+    def _run_subprocess(self, cmd: list[str], cwd: str, env: dict, prompt_bytes: bytes) -> list[StreamEvent]:
+        """Run subprocess synchronously (called via asyncio.to_thread)."""
+        proc = subprocess.Popen(
+            cmd,
+            cwd=cwd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            stdin=subprocess.PIPE,
+            env=env,
+        )
+        events: list[StreamEvent] = []
+        stdout_data, stderr_data = proc.communicate(input=prompt_bytes)
+        self._returncode = proc.returncode
+        self._stderr = stderr_data.decode("utf-8", errors="replace").strip()
+        for line in stdout_data.decode("utf-8", errors="replace").splitlines():
+            raw = line.strip()
+            event = parse_stream_line(raw)
+            if event:
+                events.append(event)
+        return events
+
     async def execute(self, task: str, event_callback=None) -> list[StreamEvent]:
         """Execute claude -p and stream events."""
-        import sys
         prompt = self.build_prompt(task)
         claude_cmd = "claude.cmd" if sys.platform == "win32" else "claude"
         cmd = [
-            claude_cmd, "-p", prompt,
+            claude_cmd, "-p", "-",
             "--output-format", "stream-json",
             "--verbose",
             "--max-turns", str(self.agent_def.max_turns),
@@ -64,7 +87,6 @@ class AgentRunner:
         import os
         env = dict(os.environ)
         if sys.platform == "win32":
-            import shutil
             git_exe = shutil.which("git")
             if git_exe:
                 git_root = Path(git_exe).parent.parent.parent
@@ -74,27 +96,11 @@ class AgentRunner:
         if self.config.api_key:
             env["ANTHROPIC_API_KEY"] = self.config.api_key
 
-        self._process = await asyncio.create_subprocess_exec(
-            *cmd,
-            cwd=str(self.config.work_dir),
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-            env=env,
+        loop = asyncio.get_event_loop()
+        prompt_bytes = prompt.encode("utf-8")
+        return await loop.run_in_executor(
+            None, self._run_subprocess, cmd, str(self.config.work_dir), env, prompt_bytes,
         )
-
-        events: list[StreamEvent] = []
-        assert self._process.stdout is not None
-
-        async for line in self._process.stdout:
-            raw = line.decode("utf-8").strip()
-            event = parse_stream_line(raw)
-            if event:
-                events.append(event)
-                if event_callback:
-                    await event_callback(event)
-
-        await self._process.wait()
-        return events
 
     async def collect_outputs(self) -> list[str]:
         """Copy output files from work dir to session dir."""
@@ -115,13 +121,8 @@ class AgentRunner:
             shutil.rmtree(self.config.work_dir)
 
     async def kill(self) -> None:
-        """Force-kill the subprocess."""
-        if self._process and self._process.returncode is None:
-            self._process.terminate()
-            try:
-                await asyncio.wait_for(self._process.wait(), timeout=5.0)
-            except asyncio.TimeoutError:
-                self._process.kill()
+        """Force-kill the subprocess (no-op for sync subprocess)."""
+        pass
 
     async def run(self, task: str, event_callback=None) -> AgentResult:
         """Full lifecycle: prepare -> execute -> collect -> cleanup."""
@@ -131,12 +132,6 @@ class AgentRunner:
             events = await self.execute(task, event_callback)
             output_files = await self.collect_outputs()
 
-            # Capture stderr for diagnostics if process failed
-            stderr_info = ""
-            if self._process and self._process.returncode != 0 and self._process.stderr:
-                stderr_bytes = await self._process.stderr.read()
-                stderr_info = stderr_bytes.decode("utf-8", errors="replace").strip()
-
             # Check result
             final = next((e for e in reversed(events) if e.type in ("completed", "failed")), None)
             success = final is not None and final.type == "completed"
@@ -144,8 +139,8 @@ class AgentRunner:
             error_msg = None
             if not success:
                 error_msg = final.error if final and final.type == "failed" else None
-                if stderr_info:
-                    error_msg = f"{error_msg or 'Process exited with non-zero code'}\nstderr: {stderr_info}"
+                if self._stderr:
+                    error_msg = f"{error_msg or 'Process exited with non-zero code'}\nstderr: {self._stderr}"
 
             return AgentResult(
                 agent_id=self.agent_def.id,
@@ -155,6 +150,11 @@ class AgentRunner:
                 duration_ms=int((time.monotonic() - start) * 1000),
             )
         except Exception as e:
+            import logging, traceback
+            logging.getLogger(__name__).error(
+                "[RUNNER] agent=%s exc=%s\n%s",
+                self.agent_def.id, e, traceback.format_exc(),
+            )
             return AgentResult(
                 agent_id=self.agent_def.id,
                 success=False,
