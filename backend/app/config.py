@@ -16,6 +16,8 @@ class AgentConfig(BaseModel):
     retry_count: int = 1
     work_dir: str = "/tmp/agentoffice"
     api_key: str = ""
+    api_base_url: str = ""
+    allowed_tools: list[str] = []
 
 
 class VaultConfig(BaseModel):

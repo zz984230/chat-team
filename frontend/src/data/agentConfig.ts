@@ -35,15 +35,6 @@ export const AGENT_CONFIGS: Record<string, AgentVisualConfig> = {
     homePosition: { x: 5, y: 4 },
     animationSpeed: { idle: 0.08, walking: 0.15, working: 0.08, thinking: 0.08 },
   },
-  researcher: {
-    agentId: 'researcher',
-    spriteKey: 'f6',
-    spriteUrl: '/assets/32x32folk.png',
-    room: 'design',
-    position: { x: 9, y: 4 },
-    homePosition: { x: 9, y: 4 },
-    animationSpeed: { idle: 0.08, walking: 0.15, working: 0.08, thinking: 0.08 },
-  },
   writer: {
     agentId: 'writer',
     spriteKey: 'f3',

@@ -18,7 +18,6 @@ def _create_agent_yamls(agents_dir: Path) -> None:
     agents = [
         {"id": "analyst", "name": "需求分析师", "system_prompt": "You are an analyst."},
         {"id": "architect", "name": "架构师", "system_prompt": "You are an architect."},
-        {"id": "researcher", "name": "研究员", "system_prompt": "You are a researcher."},
         {"id": "writer", "name": "整合输出师", "system_prompt": "You are a writer."},
     ]
     for agent in agents:
@@ -66,13 +65,13 @@ async def test_run_default_workflow_phases(engine: WorkflowEngine):
     session = engine.create_session(req)
     await engine.execute_session(session)
 
-    # Should have called pool.submit once per agent (4 total: analyst + architect + researcher + writer)
-    assert engine.pool.submit.call_count == 4
+    # Should have called pool.submit once per agent (3 total: analyst + architect + writer)
+    assert engine.pool.submit.call_count == 3
 
 
 @pytest.mark.asyncio
 async def test_phase_2_runs_parallel(engine: WorkflowEngine):
-    """Phase 2 (architect + researcher) runs both agents in parallel."""
+    """Phase 2 runs architect agent."""
     req = CreateSessionRequest(requirement="test")
 
     call_order = []
@@ -93,7 +92,6 @@ async def test_phase_2_runs_parallel(engine: WorkflowEngine):
     # Phase 2 agents should overlap (not strictly sequential)
     # Both should appear before writer
     assert "architect" in call_order
-    assert "researcher" in call_order
     assert "writer" in call_order
     assert call_order.index("writer") > call_order.index("architect")
 

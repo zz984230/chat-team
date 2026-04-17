@@ -65,11 +65,11 @@ class Session(BaseModel):
         if req.mode == SessionMode.DEFAULT:
             phases = [
                 Phase(id=1, name="需求分析", agents=["analyst"]),
-                Phase(id=2, name="方案设计", agents=["architect", "researcher"]),
+                Phase(id=2, name="方案设计", agents=["architect"]),
                 Phase(id=3, name="整合输出", agents=["writer"]),
             ]
         else:
-            agents = req.agents or ["analyst", "architect", "researcher"]
+            agents = req.agents or ["analyst", "architect"]
             phases = [
                 Phase(id=1, name="头脑风暴", agents=agents),
                 Phase(id=2, name="整合输出", agents=["writer"]),

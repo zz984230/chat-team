@@ -20,6 +20,8 @@ class AgentRunConfig(BaseModel):
     input_files: list[Path] = []
     timeout_seconds: int = 300
     api_key: str = ""
+    api_base_url: str = ""
+    allowed_tools: list[str] = []
 
 
 class AgentRunner:
@@ -30,6 +32,7 @@ class AgentRunner:
         self.config = config
         self._returncode: int | None = None
         self._stderr: str = ""
+        self._process: subprocess.Popen | None = None
 
     async def prepare(self) -> None:
         """Create work directory and copy input files."""
@@ -62,6 +65,7 @@ class AgentRunner:
             stdin=subprocess.PIPE,
             env=env,
         )
+        self._process = proc
         events: list[StreamEvent] = []
         stdout_data, stderr_data = proc.communicate(input=prompt_bytes)
         self._returncode = proc.returncode
@@ -81,8 +85,14 @@ class AgentRunner:
             claude_cmd, "-p", "-",
             "--output-format", "stream-json",
             "--verbose",
+            "--bare",
             "--max-turns", str(self.agent_def.max_turns),
         ]
+        if self.config.allowed_tools:
+            cmd.extend(["--allowedTools", " ".join(self.config.allowed_tools)])
+        cmd.extend(["--disallowedTools", "WebSearch WebFetch"])
+        if self.agent_def.model:
+            cmd.extend(["--model", self.agent_def.model])
 
         import os
         env = dict(os.environ)
@@ -95,6 +105,8 @@ class AgentRunner:
                     env["CLAUDE_CODE_GIT_BASH_PATH"] = str(git_bash)
         if self.config.api_key:
             env["ANTHROPIC_API_KEY"] = self.config.api_key
+        if self.config.api_base_url:
+            env["ANTHROPIC_BASE_URL"] = self.config.api_base_url
 
         loop = asyncio.get_event_loop()
         prompt_bytes = prompt.encode("utf-8")
@@ -121,8 +133,9 @@ class AgentRunner:
             shutil.rmtree(self.config.work_dir)
 
     async def kill(self) -> None:
-        """Force-kill the subprocess (no-op for sync subprocess)."""
-        pass
+        """Force-kill the subprocess."""
+        if self._process and self._process.poll() is None:
+            self._process.kill()
 
     async def run(self, task: str, event_callback=None) -> AgentResult:
         """Full lifecycle: prepare -> execute -> collect -> cleanup."""

@@ -23,12 +23,16 @@ class WorkflowEngine:
         ws_manager: WebSocketManager,
         work_dir: str = "/tmp/agentoffice",
         api_key: str = "",
+        api_base_url: str = "",
+        allowed_tools: list[str] = [],
     ):
         self.vault_manager = vault_manager
         self.pool = pool
         self.ws_manager = ws_manager
         self.work_dir = work_dir
         self.api_key = api_key
+        self.api_base_url = api_base_url
+        self.allowed_tools = allowed_tools
         self._agent_defs: dict[str, AgentDefinition] = {}
         self._sessions: dict[str, Session] = {}
         self._load_agent_defs()
@@ -93,7 +97,7 @@ class WorkflowEngine:
         phase = session.phases[0]
         await self._run_phase(session, phase, "请分析以下需求并输出需求澄清文档。", session_dir)
 
-        # Phase 2: architect + researcher (parallel)
+        # Phase 2: architect (sequential)
         phase = session.phases[1]
         await self._run_parallel_phase(session, phase, session_dir)
 
@@ -140,6 +144,8 @@ class WorkflowEngine:
             session_dir=session_dir,
             input_files=list(session_dir.glob("*.md")),
             api_key=self.api_key,
+            api_base_url=self.api_base_url,
+            allowed_tools=self.allowed_tools,
         )
         runner = AgentRunner(agent_def, config)
 
@@ -173,6 +179,8 @@ class WorkflowEngine:
                 session_dir=session_dir,
                 input_files=list(session_dir.glob("*.md")),
                 api_key=self.api_key,
+                api_base_url=self.api_base_url,
+                allowed_tools=self.allowed_tools,
             )
             runner = AgentRunner(agent_def, config)
             return await self.pool.submit(runner, task)

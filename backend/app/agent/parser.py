@@ -45,10 +45,10 @@ def parse_stream_line(line: str) -> StreamEvent | None:
                 type="completed",
                 cost_usd=data.get("cost_usd"),
             )
-        elif subtype == "error":
+        else:
             return StreamEvent(
                 type="failed",
-                error=data.get("error", "unknown error"),
+                error=data.get("error", data.get("errors", "unknown error")),
             )
 
     return None

@@ -15,7 +15,6 @@ def _create_agent_yamls(agents_dir: Path) -> None:
     agents = [
         {"id": "analyst", "name": "需求分析师", "system_prompt": "You are an analyst."},
         {"id": "architect", "name": "架构师", "system_prompt": "You are an architect."},
-        {"id": "researcher", "name": "研究员", "system_prompt": "You are a researcher."},
         {"id": "writer", "name": "整合输出师", "system_prompt": "You are a writer."},
     ]
     for agent in agents:

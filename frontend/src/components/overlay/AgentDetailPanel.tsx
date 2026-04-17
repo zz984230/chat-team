@@ -4,14 +4,12 @@ import { useAgentStore } from '../../stores/agentStore';
 const AGENT_NAMES: Record<string, string> = {
   analyst: '需求分析师',
   architect: '方案架构师',
-  researcher: '资料研究员',
   writer: '方案撰写员',
 };
 
 const AGENT_COLORS: Record<string, string> = {
   analyst: 'text-green-400',
   architect: 'text-blue-400',
-  researcher: 'text-yellow-400',
   writer: 'text-purple-400',
 };
 

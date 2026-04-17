@@ -34,7 +34,6 @@ def _create_agent_yamls(agents_dir: Path) -> None:
             "system_prompt": "You are a software architect.",
         },
         {
-            "id": "researcher",
             "name": "研究员",
             "system_prompt": "You are a researcher.",
         },

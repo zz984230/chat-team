@@ -43,9 +43,9 @@ export const ROOMS: RoomDef[] = [
     id: 'design',
     name: '设计中心',
     phase: 2,
-    agents: ['architect', 'researcher'],
+    agents: ['architect'],
     bounds: { x: 10, y: 0, width: 10, height: 8 },
-    seats: { architect: { x: 13, y: 4 }, researcher: { x: 17, y: 4 } },
+    seats: { architect: { x: 13, y: 4 } },
     floorColor: 0x303840,
     furniture: [
       { type: 'desk', x: 12, y: 3, width: 3, height: 1, color: 0x6b5b47 },
