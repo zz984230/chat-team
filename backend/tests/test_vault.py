@@ -124,3 +124,38 @@ def test_list_outputs(tmp_vault: Path):
     outputs = vm.list_outputs("20260413-153000-abc")
     assert "01-需求澄清.md" in outputs
     assert "02-技术方案.md" in outputs
+
+
+def test_delete_session(tmp_vault: Path):
+    """delete_session removes session directory entirely."""
+    vm = VaultManager(tmp_vault)
+    session = Session.from_request(
+        CreateSessionRequest(requirement="test"),
+        "20260413-153000-abc",
+    )
+    vm.create_session(session)
+
+    result = vm.delete_session("20260413-153000-abc")
+    assert result is True
+    assert not (tmp_vault / "sessions" / "20260413-153000-abc").exists()
+
+
+def test_delete_session_not_found(tmp_vault: Path):
+    """delete_session returns False for nonexistent session."""
+    vm = VaultManager(tmp_vault)
+    result = vm.delete_session("nonexistent")
+    assert result is False
+
+
+def test_delete_session_removes_from_list(tmp_vault: Path):
+    """delete_session removes session from list_sessions results."""
+    vm = VaultManager(tmp_vault)
+    session = Session.from_request(
+        CreateSessionRequest(requirement="test"),
+        "20260413-153000-abc",
+    )
+    vm.create_session(session)
+
+    assert len(vm.list_sessions()) == 1
+    vm.delete_session("20260413-153000-abc")
+    assert len(vm.list_sessions()) == 0

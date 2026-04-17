@@ -1,6 +1,7 @@
 # backend/app/vault/manager.py
 from datetime import datetime
 from pathlib import Path
+import shutil
 
 import yaml
 
@@ -93,6 +94,14 @@ class VaultManager:
             for f in session_dir.iterdir()
             if f.is_file() and f.name not in exclude
         )
+
+    def delete_session(self, session_id: str) -> bool:
+        """Delete session directory and all contents."""
+        session_dir = self._sessions_path / session_id
+        if not session_dir.exists():
+            return False
+        shutil.rmtree(session_dir)
+        return True
 
     def _write_meta(self, session_dir: Path, session: Session) -> None:
         """Serialize session to meta.yaml."""
