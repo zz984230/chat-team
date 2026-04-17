@@ -152,10 +152,9 @@ async def test_delete_running_session_conflict(client: AsyncClient):
     create_resp = await client.post("/api/sessions", json={"requirement": "running"})
     session_id = create_resp.json()["id"]
 
-    # Manually set status to running via vault
     from app.api.sessions import _engine
     assert _engine is not None
-    session = _engine.vault_manager.get_session(session_id)
+    session = _engine.get_session(session_id)
     session.status = SessionStatus.RUNNING
     _engine.vault_manager.update_session(session)
 
@@ -164,8 +163,39 @@ async def test_delete_running_session_conflict(client: AsyncClient):
 
 
 @pytest.mark.asyncio
+async def test_delete_paused_session_conflict(client: AsyncClient):
+    """DELETE /api/sessions/{id} returns 409 for paused session."""
+    create_resp = await client.post("/api/sessions", json={"requirement": "paused"})
+    session_id = create_resp.json()["id"]
+
+    from app.api.sessions import _engine
+    assert _engine is not None
+    session = _engine.get_session(session_id)
+    session.status = SessionStatus.PAUSED
+    _engine.vault_manager.update_session(session)
+
+    resp = await client.delete(f"/api/sessions/{session_id}")
+    assert resp.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_delete_failed_session(client: AsyncClient):
+    """DELETE /api/sessions/{id} succeeds for failed session."""
+    create_resp = await client.post("/api/sessions", json={"requirement": "failed"})
+    session_id = create_resp.json()["id"]
+
+    from app.api.sessions import _engine
+    assert _engine is not None
+    session = _engine.get_session(session_id)
+    session.status = SessionStatus.FAILED
+    _engine.vault_manager.update_session(session)
+
+    resp = await client.delete(f"/api/sessions/{session_id}")
+    assert resp.status_code == 204
+
+
+@pytest.mark.asyncio
 async def test_delete_session_invalid_id(client: AsyncClient):
     """DELETE /api/sessions/{id} returns 400 for invalid session ID with backslash."""
-    # URL-encoded backslash (%5C) should be decoded and rejected by the endpoint
     resp = await client.request("DELETE", "/api/sessions/foo%5Cbar")
     assert resp.status_code == 400

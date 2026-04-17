@@ -143,6 +143,7 @@ async def delete_session(session_id: str):
         raise HTTPException(status_code=409, detail=f"Cannot delete session in '{session.status.value}' state")
     _engine.remove_session(session_id)
     _engine.vault_manager.delete_session(session_id)
+    await _ws_manager.emit(session_id, "session:deleted")
 
 
 @router.websocket("/ws/sessions/{session_id}")
