@@ -11,3 +11,7 @@ frontend/dist/
 
 # Runtime data
 backend/vault/sessions/
+
+.claude/settings.local.json
+
+backend/settings.yaml
