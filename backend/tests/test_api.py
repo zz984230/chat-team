@@ -116,3 +116,56 @@ async def test_health_check(client: AsyncClient):
     resp = await client.get("/health")
     assert resp.status_code == 200
     assert resp.json()["status"] == "ok"
+
+
+@pytest.mark.asyncio
+async def test_delete_session(client: AsyncClient):
+    """DELETE /api/sessions/{id} removes a completed session."""
+    create_resp = await client.post("/api/sessions", json={"requirement": "to delete"})
+    session_id = create_resp.json()["id"]
+
+    # Set status to COMPLETED so deletion is allowed
+    from app.api.sessions import _engine
+    assert _engine is not None
+    session = _engine.get_session(session_id)
+    session.status = SessionStatus.COMPLETED
+    _engine.vault_manager.update_session(session)
+
+    resp = await client.delete(f"/api/sessions/{session_id}")
+    assert resp.status_code == 204
+
+    # Verify it's gone
+    get_resp = await client.get(f"/api/sessions/{session_id}")
+    assert get_resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_delete_session_not_found(client: AsyncClient):
+    """DELETE /api/sessions/{id} returns 404 for nonexistent."""
+    resp = await client.delete("/api/sessions/nonexistent")
+    assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_delete_running_session_conflict(client: AsyncClient):
+    """DELETE /api/sessions/{id} returns 409 for running session."""
+    create_resp = await client.post("/api/sessions", json={"requirement": "running"})
+    session_id = create_resp.json()["id"]
+
+    # Manually set status to running via vault
+    from app.api.sessions import _engine
+    assert _engine is not None
+    session = _engine.vault_manager.get_session(session_id)
+    session.status = SessionStatus.RUNNING
+    _engine.vault_manager.update_session(session)
+
+    resp = await client.delete(f"/api/sessions/{session_id}")
+    assert resp.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_delete_session_invalid_id(client: AsyncClient):
+    """DELETE /api/sessions/{id} returns 400 for invalid session ID with backslash."""
+    # URL-encoded backslash (%5C) should be decoded and rejected by the endpoint
+    resp = await client.request("DELETE", "/api/sessions/foo%5Cbar")
+    assert resp.status_code == 400

@@ -213,6 +213,11 @@ class WorkflowEngine:
         """Get session by ID (prefers in-memory for live state)."""
         return self._sessions.get(session_id) or self.vault_manager.get_session(session_id)
 
+
+    def remove_session(self, session_id: str) -> None:
+        """Remove session from in-memory cache."""
+        self._sessions.pop(session_id, None)
+
     def list_sessions(self) -> list[Session]:
         """List all sessions (merges in-memory and vault)."""
         vault_sessions = {s.id: s for s in self.vault_manager.list_sessions()}

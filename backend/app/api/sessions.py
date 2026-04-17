@@ -130,6 +130,21 @@ async def cancel_session(session_id: str):
     return session.model_dump(mode="json")
 
 
+@router.delete("/sessions/{session_id}", status_code=204)
+async def delete_session(session_id: str):
+    """Delete a completed, failed, or cancelled session."""
+    assert _engine is not None
+    if "/" in session_id or "\\" in session_id:
+        raise HTTPException(status_code=400, detail="Invalid session ID")
+    session = _engine.get_session(session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail="Session not found")
+    if session.status in (SessionStatus.RUNNING, SessionStatus.PAUSED):
+        raise HTTPException(status_code=409, detail=f"Cannot delete session in '{session.status.value}' state")
+    _engine.remove_session(session_id)
+    _engine.vault_manager.delete_session(session_id)
+
+
 @router.websocket("/ws/sessions/{session_id}")
 async def session_websocket(websocket: WebSocket, session_id: str):
     assert _ws_manager is not None
