@@ -43,6 +43,7 @@ def parse_stream_line(line: str) -> StreamEvent | None:
         if subtype == "success":
             return StreamEvent(
                 type="completed",
+                content=data.get("result"),
                 cost_usd=data.get("cost_usd"),
             )
         else:

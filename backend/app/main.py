@@ -2,15 +2,19 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.config import Settings
+from pathlib import Path
+
+from app.config import Settings, load_settings
 from app.dependencies import create_engine
 from app.api.router import router as api_router
 from app.api.sessions import set_engine as set_sessions_engine
 from app.api.agents import set_engine as set_agents_engine
 
+_SETTINGS_PATH = Path(__file__).resolve().parent.parent / "settings.yaml"
+
 
 def create_app(settings: Settings | None = None) -> FastAPI:
-    settings = settings or Settings()
+    settings = settings or load_settings(_SETTINGS_PATH)
 
     app = FastAPI(
         title="AgentOffice",

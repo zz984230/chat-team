@@ -4,6 +4,7 @@ from unittest.mock import AsyncMock, patch, MagicMock
 
 import pytest
 from app.agent.runner import AgentRunner, AgentRunConfig
+from app.agent.parser import StreamEvent
 from app.workflow.models import AgentDefinition, AgentResult
 
 
@@ -50,7 +51,6 @@ async def test_build_prompt(analyst_def: AgentDefinition, run_config: AgentRunCo
 
     assert "资深需求分析师" in prompt
     assert "分析需求" in prompt
-    assert "01-需求澄清.md" in prompt
 
 
 @pytest.mark.asyncio
@@ -75,5 +75,29 @@ async def test_cleanup(analyst_def: AgentDefinition, run_config: AgentRunConfig)
 
     runner = AgentRunner(analyst_def, run_config)
     await runner.cleanup()
+
+    assert not run_config.work_dir.exists()
+
+
+def test_save_output_from_events(analyst_def: AgentDefinition, run_config: AgentRunConfig):
+    """_save_output_from_events() writes result text to output file."""
+    run_config.session_dir.mkdir(parents=True, exist_ok=True)
+    runner = AgentRunner(analyst_def, run_config)
+    events = [
+        StreamEvent(type="thinking", content="分析中..."),
+        StreamEvent(type="completed", content="# 需求分析\n\n分析结果", cost_usd=0.01),
+    ]
+    runner._save_output_from_events(events)
+
+    assert (run_config.work_dir / "01-需求澄清.md").exists()
+    assert (run_config.work_dir / "01-需求澄清.md").read_text(encoding="utf-8") == "# 需求分析\n\n分析结果"
+
+
+def test_save_output_from_events_no_content(analyst_def: AgentDefinition, run_config: AgentRunConfig):
+    """_save_output_from_events() does nothing when completed event has no content."""
+    run_config.session_dir.mkdir(parents=True, exist_ok=True)
+    runner = AgentRunner(analyst_def, run_config)
+    events = [StreamEvent(type="completed", cost_usd=0.01)]
+    runner._save_output_from_events(events)
 
     assert not run_config.work_dir.exists()

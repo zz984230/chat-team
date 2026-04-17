@@ -44,10 +44,6 @@ class AgentRunner:
     def build_prompt(self, task: str) -> str:
         """Build the full prompt for claude -p."""
         parts = [self.agent_def.system_prompt]
-        if self.agent_def.output_file:
-            parts.append(
-                f"\n\n请将你的分析结果写入文件: {self.agent_def.output_file}"
-            )
         if self.agent_def.output_template:
             parts.append(
                 f"\n\n输出格式参考:\n{self.agent_def.output_template}"
@@ -127,6 +123,16 @@ class AgentRunner:
 
         return output_files
 
+    def _save_output_from_events(self, events: list[StreamEvent]) -> None:
+        """Write agent output to file extracted from stream events."""
+        if not self.agent_def.output_file:
+            return
+        final = next((e for e in reversed(events) if e.type == "completed" and e.content), None)
+        if not final or not final.content:
+            return
+        self.config.work_dir.mkdir(parents=True, exist_ok=True)
+        (self.config.work_dir / self.agent_def.output_file).write_text(final.content, encoding="utf-8")
+
     async def cleanup(self) -> None:
         """Remove work directory."""
         if self.config.work_dir.exists():
@@ -143,6 +149,7 @@ class AgentRunner:
         try:
             await self.prepare()
             events = await self.execute(task, event_callback)
+            self._save_output_from_events(events)
             output_files = await self.collect_outputs()
 
             # Check result
