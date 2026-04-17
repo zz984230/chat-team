@@ -13,6 +13,7 @@ interface SessionState {
   setActiveSession: (session: Session | null) => void;
   updatePhaseFromEvent: (sessionId: string, phaseId: number, status: string, outputs?: string[]) => void;
   setSessionStatus: (sessionId: string, status: string) => void;
+  deleteSession: (id: string) => Promise<void>;
 }
 
 export const useSessionStore = create<SessionState>((set, get) => ({
@@ -73,6 +74,14 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     set((state) => ({
       activeSession: state.activeSession?.id === sessionId ? updater(state.activeSession!) : state.activeSession,
       sessions: state.sessions.map((s) => (s.id === sessionId ? updater(s) : s)),
+    }));
+  },
+
+  deleteSession: async (id) => {
+    await api.deleteSession(id);
+    set((state) => ({
+      sessions: state.sessions.filter((s) => s.id !== id),
+      activeSession: state.activeSession?.id === id ? null : state.activeSession,
     }));
   },
 }));

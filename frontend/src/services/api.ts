@@ -11,6 +11,16 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
   return res.json();
 }
 
+async function requestVoid(url: string, options?: RequestInit): Promise<void> {
+  const res = await fetch(url, {
+    headers: { 'Content-Type': 'application/json' },
+    ...options,
+  });
+  if (!res.ok) {
+    throw new Error(`API error: ${res.status} ${res.statusText}`);
+  }
+}
+
 export const api = {
   listSessions: () => request<Session[]>('/api/sessions'),
 
@@ -43,6 +53,9 @@ export const api = {
 
   cancelSession: (id: string) =>
     request<Session>(`/api/sessions/${id}/cancel`, { method: 'POST' }),
+
+  deleteSession: (id: string) =>
+    requestVoid(`/api/sessions/${id}`, { method: 'DELETE' }),
 
   listAgents: () => request<AgentDefinition[]>('/api/agents'),
 
