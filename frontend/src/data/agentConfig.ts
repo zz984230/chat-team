@@ -3,11 +3,8 @@ export interface AgentVisualConfig {
   spriteKey: string;
   spriteUrl: string;
   room: string;
-  /** Position in room (tile coordinates) */
   position: { x: number; y: number };
-  /** Home position (same as position, used for returning after tasks) */
   homePosition: { x: number; y: number };
-  /** Animation speed for different states (frames per second) */
   animationSpeed: {
     idle: number;
     walking: number;
@@ -21,27 +18,36 @@ export const AGENT_CONFIGS: Record<string, AgentVisualConfig> = {
     agentId: 'analyst',
     spriteKey: 'f1',
     spriteUrl: '/assets/32x32folk.png',
-    room: 'meeting',
-    position: { x: 5, y: 5 },
-    homePosition: { x: 5, y: 5 },
+    room: 'rd',
+    position: { x: 11, y: 3 },
+    homePosition: { x: 11, y: 3 },
     animationSpeed: { idle: 0.08, walking: 0.15, working: 0.08, thinking: 0.08 },
   },
   architect: {
     agentId: 'architect',
     spriteKey: 'f4',
     spriteUrl: '/assets/32x32folk.png',
-    room: 'design',
-    position: { x: 5, y: 4 },
-    homePosition: { x: 5, y: 4 },
+    room: 'rd',
+    position: { x: 14, y: 5 },
+    homePosition: { x: 14, y: 5 },
     animationSpeed: { idle: 0.08, walking: 0.15, working: 0.08, thinking: 0.08 },
   },
-  writer: {
-    agentId: 'writer',
+  'dev-lead': {
+    agentId: 'dev-lead',
+    spriteKey: 'f6',
+    spriteUrl: '/assets/32x32folk.png',
+    room: 'rd',
+    position: { x: 11, y: 7 },
+    homePosition: { x: 11, y: 7 },
+    animationSpeed: { idle: 0.08, walking: 0.15, working: 0.08, thinking: 0.08 },
+  },
+  'test-lead': {
+    agentId: 'test-lead',
     spriteKey: 'f3',
     spriteUrl: '/assets/32x32folk.png',
-    room: 'writing',
-    position: { x: 5, y: 12 },
-    homePosition: { x: 5, y: 12 },
+    room: 'rd',
+    position: { x: 8, y: 5 },
+    homePosition: { x: 8, y: 5 },
     animationSpeed: { idle: 0.08, walking: 0.15, working: 0.08, thinking: 0.08 },
   },
 };
