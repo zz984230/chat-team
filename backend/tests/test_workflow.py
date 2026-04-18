@@ -20,7 +20,6 @@ def _create_agent_yamls(agents_dir: Path) -> None:
         {"id": "architect", "name": "架构师", "system_prompt": "You are an architect.", "room": "rd"},
         {"id": "dev-lead", "name": "开发负责人", "system_prompt": "You are a dev lead.", "room": "rd"},
         {"id": "test-lead", "name": "测试负责人", "system_prompt": "You are a test lead.", "room": "rd"},
-        {"id": "moderator", "name": "讨论主持人", "system_prompt": "You are a moderator.", "room": "moderator"},
     ]
     for agent in agents:
         path = agents_dir / f"{agent['id']}.yaml"
@@ -134,8 +133,8 @@ async def test_list_sessions(engine: WorkflowEngine):
 
 
 @pytest.mark.asyncio
-async def test_brainstorm_token_passing_flow(engine: WorkflowEngine):
-    """Brainstorm mode uses token-passing: moderator selects speakers."""
+async def test_brainstorm_all_agents_participate(engine: WorkflowEngine):
+    """Brainstorm mode runs all room agents in each round."""
     req = CreateSessionRequest(
         requirement="讨论主题",
         mode=SessionMode.BRAINSTORM,
@@ -143,15 +142,10 @@ async def test_brainstorm_token_passing_flow(engine: WorkflowEngine):
         room="rd",
     )
 
-    async def mock_moderator(session, state, session_dir):
-        agents = ["analyst", "architect", "dev-lead", "test-lead"]
-        if len(state.spoken_this_round) < len(agents):
-            return agents[len(state.spoken_this_round)]
-        return None
-
-    engine._run_moderator_turn = mock_moderator
+    spoken = []
 
     async def mock_agent_turn(session, state, agent_id, session_dir):
+        spoken.append(agent_id)
         return f"{agent_id} says something"
 
     engine._run_agent_turn = mock_agent_turn
@@ -162,27 +156,24 @@ async def test_brainstorm_token_passing_flow(engine: WorkflowEngine):
     assert session.status == SessionStatus.COMPLETED
     assert len(session.phases) == 1
     assert session.phases[0].status == PhaseStatus.COMPLETED
+    assert set(spoken) == {"analyst", "architect", "dev-lead", "test-lead"}
 
 
 @pytest.mark.asyncio
-async def test_brainstorm_skips_spoken_agents(engine: WorkflowEngine):
-    """Moderator will not re-select already-spoken agents."""
+async def test_brainstorm_multiple_rounds(engine: WorkflowEngine):
+    """Brainstorm mode runs multiple rounds with all agents each round."""
     req = CreateSessionRequest(
-        requirement="test",
+        requirement="讨论主题",
         mode=SessionMode.BRAINSTORM,
-        config={"rounds": 1},
+        config={"rounds": 2},
         room="rd",
     )
 
-    async def mock_moderator(session, state, session_dir):
-        if "analyst" not in state.spoken_this_round:
-            return "analyst"
-        return None
-
-    engine._run_moderator_turn = mock_moderator
+    spoken = []
 
     async def mock_agent_turn(session, state, agent_id, session_dir):
-        return f"{agent_id} content"
+        spoken.append((state.current_round, agent_id))
+        return f"{agent_id} in round {state.current_round}"
 
     engine._run_agent_turn = mock_agent_turn
 
@@ -190,6 +181,11 @@ async def test_brainstorm_skips_spoken_agents(engine: WorkflowEngine):
     await engine.execute_session(session)
 
     assert session.status == SessionStatus.COMPLETED
+    assert len(spoken) == 8  # 4 agents × 2 rounds
+    round1_agents = [a for r, a in spoken if r == 1]
+    round2_agents = [a for r, a in spoken if r == 2]
+    assert set(round1_agents) == {"analyst", "architect", "dev-lead", "test-lead"}
+    assert set(round2_agents) == {"analyst", "architect", "dev-lead", "test-lead"}
 
 
 @pytest.mark.asyncio
@@ -202,15 +198,8 @@ async def test_brainstorm_writes_discussion_log(engine: WorkflowEngine):
         room="rd",
     )
 
-    async def mock_moderator(session, state, session_dir):
-        if not state.spoken_this_round:
-            return "analyst"
-        return None
-
-    engine._run_moderator_turn = mock_moderator
-
     async def mock_agent_turn(session, state, agent_id, session_dir):
-        return "analyst said hello"
+        return f"{agent_id} said hello"
 
     engine._run_agent_turn = mock_agent_turn
 
@@ -223,53 +212,5 @@ async def test_brainstorm_writes_discussion_log(engine: WorkflowEngine):
     content = log_file.read_text(encoding="utf-8")
     assert "analyst" in content
     assert "analyst said hello" in content
-
-
-@pytest.mark.asyncio
-async def test_moderator_turn_extracts_tool_call(engine: WorkflowEngine):
-    """_run_moderator_turn parses nominate_speaker tool call from stream events."""
-    from app.workflow.models import DiscussionState
-
-    req = CreateSessionRequest(requirement="test", mode=SessionMode.BRAINSTORM, room="rd")
-    session = engine.create_session(req)
-    session_dir = engine.vault_manager._sessions_path / session.id
-    session_dir.mkdir(parents=True, exist_ok=True)
-
-    state = DiscussionState(rounds_total=1)
-
-    with patch("app.agent.runner.AgentRunner.execute") as mock_execute:
-        from app.agent.parser import StreamEvent
-        mock_execute.return_value = [
-            StreamEvent(type="thinking", content="选择发言者..."),
-            StreamEvent(
-                type="working",
-                tool_name="nominate_speaker",
-                tool_input={"agent_id": "architect"},
-            ),
-            StreamEvent(type="completed", content="选择 architect", cost_usd=0.001),
-        ]
-
-        result = await engine._run_moderator_turn(session, state, session_dir)
-        assert result == "architect"
-
-
-@pytest.mark.asyncio
-async def test_moderator_turn_returns_none_when_no_tool_call(engine: WorkflowEngine):
-    """_run_moderator_turn returns None when moderator doesn't call tool."""
-    from app.workflow.models import DiscussionState
-
-    req = CreateSessionRequest(requirement="test", mode=SessionMode.BRAINSTORM, room="rd")
-    session = engine.create_session(req)
-    session_dir = engine.vault_manager._sessions_path / session.id
-    session_dir.mkdir(parents=True, exist_ok=True)
-
-    state = DiscussionState(rounds_total=1, spoken_this_round=["analyst", "architect", "dev-lead", "test-lead"])
-
-    with patch("app.agent.runner.AgentRunner.execute") as mock_execute:
-        from app.agent.parser import StreamEvent
-        mock_execute.return_value = [
-            StreamEvent(type="completed", content="所有人都已发言", cost_usd=0.001),
-        ]
-
-        result = await engine._run_moderator_turn(session, state, session_dir)
-        assert result is None
+    assert "dev-lead" in content
+    assert "test-lead" in content

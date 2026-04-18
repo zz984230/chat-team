@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { Graphics, Container } from 'pixi.js';
 import { Text } from '@pixi/text';
 import { ROOMS, MAP_CONFIG } from '../../data/mapConfig';
@@ -143,6 +143,8 @@ export function OfficeMap() {
   const openNewTask = useUiStore((s) => s.openNewTaskModal);
   const openArchive = useUiStore((s) => s.openRoomArchive);
   const activeSession = useSessionStore((s) => s.activeSession);
+  const activeSessionRef = useRef(activeSession);
+  activeSessionRef.current = activeSession;
 
   useEffect(() => {
     if (!viewport) return;
@@ -277,7 +279,7 @@ export function OfficeMap() {
           hitArea.on('pointerout', () => { glow.alpha = 0; });
 
           hitArea.on('pointerdown', () => {
-            if (activeSession && activeSession.status === 'running') {
+            if (activeSessionRef.current && activeSessionRef.current.status === 'running') {
               return;
             }
             openNewTask(room.id);
@@ -319,7 +321,7 @@ export function OfficeMap() {
       viewport.removeChild(container);
       container.destroy({ children: true });
     };
-  }, [viewport, openNewTask, openArchive, activeSession]);
+  }, [viewport, openNewTask, openArchive]);
 
   return null;
 }

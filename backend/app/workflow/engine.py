@@ -119,7 +119,7 @@ class WorkflowEngine:
         await self._run_phase(session, phase, "请阅读所有前置文档，制定测试计划。", session_dir)
 
     async def _run_brainstorm_workflow(self, session: Session) -> None:
-        """Run brainstorm mode with token-passing discussion."""
+        """Run brainstorm mode: all room agents discuss in rounds."""
         from app.workflow.models import DiscussionState, DiscussionTurn
 
         session_dir = self.vault_manager._sessions_path / session.id
@@ -133,17 +133,11 @@ class WorkflowEngine:
 
         for round_num in range(1, state.rounds_total + 1):
             state.current_round = round_num
-            state.spoken_this_round = []
 
-            while True:
-                next_agent = await self._run_moderator_turn(session, state, session_dir)
-                if next_agent is None:
-                    break
-
-                content = await self._run_agent_turn(session, state, next_agent, session_dir)
-                turn = DiscussionTurn(round=round_num, agent_id=next_agent, content=content)
+            for agent_id in phase.agents:
+                content = await self._run_agent_turn(session, state, agent_id, session_dir)
+                turn = DiscussionTurn(round=round_num, agent_id=agent_id, content=content)
                 state.turns.append(turn)
-                state.spoken_this_round.append(next_agent)
 
         # Write combined discussion log
         log_path = session_dir / "01-讨论记录.md"
@@ -157,57 +151,6 @@ class WorkflowEngine:
         phase.completed_at = datetime.now()
         self.vault_manager.update_session(session)
         await self.ws_manager.emit(session.id, "phase:completed", phase=phase.id, outputs=added)
-
-    async def _run_moderator_turn(
-        self, session: Session, state: "DiscussionState", session_dir: Path,
-    ) -> str | None:
-        """Run moderator to select next speaker. Returns agent_id or None."""
-        moderator_def = self._get_agent_def("moderator")
-
-        turns_summary = ""
-        if state.turns:
-            turns_summary = "\n\n## 已有发言记录\n"
-            for t in state.turns:
-                turns_summary += f"\n### {t.agent_id}（第{t.round}轮）\n{t.content}\n"
-
-        spoken_str = ", ".join(state.spoken_this_round) if state.spoken_this_round else "无"
-
-        task = (
-            f"## 讨论信息\n"
-            f"当前第 {state.current_round}/{state.rounds_total} 轮\n"
-            f"本轮已发言：{spoken_str}\n"
-            f"原始需求：{session.input_requirement}\n"
-            f"{turns_summary}\n\n"
-            f"请选择下一个发言者。"
-        )
-
-        config = AgentRunConfig(
-            work_dir=Path(f"{self.work_dir}/{session.id}/moderator"),
-            session_dir=session_dir,
-            input_files=[],
-            api_key=self.api_key,
-            api_base_url=self.api_base_url,
-            allowed_tools=["nominate_speaker"],
-        )
-        runner = AgentRunner(moderator_def, config)
-
-        try:
-            await runner.prepare()
-            events = await runner.execute(task)
-
-            for event in reversed(events):
-                if (
-                    event.type == "working"
-                    and event.tool_name == "nominate_speaker"
-                    and event.tool_input
-                ):
-                    agent_id = event.tool_input.get("agent_id")
-                    if agent_id and agent_id not in state.spoken_this_round:
-                        return agent_id
-
-            return None
-        finally:
-            await runner.cleanup()
 
     async def _run_agent_turn(
         self, session: Session, state: "DiscussionState",
