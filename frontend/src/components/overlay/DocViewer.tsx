@@ -3,6 +3,47 @@ import ReactMarkdown from 'react-markdown';
 import { useUiStore } from '../../stores/uiStore';
 import { api } from '../../services/api';
 
+export interface DiscussionTurn {
+  round: number;
+  content: string;
+}
+
+export interface AgentDiscussion {
+  id: string;
+  turns: DiscussionTurn[];
+}
+
+export interface ParsedDiscussion {
+  requirement: string;
+  agents: AgentDiscussion[];
+}
+
+export function parseDiscussion(markdown: string): ParsedDiscussion {
+  const reqMatch = markdown.match(/## 原始需求\n([\s\S]*?)(?=\n## )/);
+  const requirement = reqMatch ? reqMatch[1].trim() : '';
+
+  const turnRegex = /## (.+?)（第(\d+)轮）\n([\s\S]*?)(?=\n## |$)/g;
+  const agentMap = new Map<string, DiscussionTurn[]>();
+  let match: RegExpExecArray | null;
+
+  while ((match = turnRegex.exec(markdown)) !== null) {
+    const agentId = match[1];
+    const round = parseInt(match[2], 10);
+    const content = match[3].trim();
+    const turns = agentMap.get(agentId) ?? [];
+    turns.push({ round, content });
+    agentMap.set(agentId, turns);
+  }
+
+  const agents: AgentDiscussion[] = [];
+  for (const [id, turns] of agentMap) {
+    turns.sort((a, b) => a.round - b.round);
+    agents.push({ id, turns });
+  }
+
+  return { requirement, agents };
+}
+
 export function DocViewer() {
   const target = useUiStore((s) => s.docViewer);
   const close = useUiStore((s) => s.closeDocViewer);
