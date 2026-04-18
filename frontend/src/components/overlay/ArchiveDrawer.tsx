@@ -5,8 +5,8 @@ import { useSessionList } from '../../hooks/useSession';
 import { Modal } from '../ui/Modal';
 
 export function ArchiveDrawer() {
-  const open = useUiStore((s) => s.archiveDrawerOpen);
-  const close = useUiStore((s) => s.closeArchiveDrawer);
+  const open = useUiStore((s) => s.roomArchiveOpen);
+  const close = useUiStore((s) => s.closeRoomArchive);
   const openDoc = useUiStore((s) => s.openDocViewer);
   const { sessions } = useSessionList();
   const setActive = useSessionStore((s) => s.setActiveSession);

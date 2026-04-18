@@ -5,6 +5,7 @@ export interface FurnitureItem {
   width: number;
   height: number;
   color: number;
+  interactive?: 'task' | 'archive';
 }
 
 export interface RoomDef {
@@ -39,7 +40,8 @@ export const ROOMS: RoomDef[] = [
     floorColor: 0x1a2e1a,
     status: 'active',
     furniture: [
-      { type: 'round_table', x: 10, y: 4, width: 3, height: 3, color: 0x6b5b47 },
+      { type: 'cabinet', x: 7, y: 0, width: 2, height: 2, color: 0x8B7355, interactive: 'archive' },
+      { type: 'round_table', x: 10, y: 4, width: 3, height: 3, color: 0x6b5b47, interactive: 'task' },
       { type: 'chair', x: 11, y: 3, width: 1, height: 1, color: 0x555566 },
       { type: 'chair', x: 14, y: 5, width: 1, height: 1, color: 0x555566 },
       { type: 'chair', x: 11, y: 7, width: 1, height: 1, color: 0x555566 },

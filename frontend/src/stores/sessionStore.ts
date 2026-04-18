@@ -9,7 +9,7 @@ interface SessionState {
 
   fetchSessions: () => Promise<void>;
   fetchSession: (id: string) => Promise<void>;
-  createSession: (requirement: string, mode: 'default' | 'brainstorm') => Promise<void>;
+  createSession: (requirement: string, mode: 'default' | 'brainstorm', room: string) => Promise<void>;
   setActiveSession: (session: Session | null) => void;
   updatePhaseFromEvent: (sessionId: string, phaseId: number, status: string, outputs?: string[]) => void;
   setSessionStatus: (sessionId: string, status: string) => void;
@@ -40,8 +40,8 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     }
   },
 
-  createSession: async (requirement, mode) => {
-    const session = await api.createSession({ requirement, mode });
+  createSession: async (requirement, mode, room) => {
+    const session = await api.createSession({ requirement, mode, room });
     set((state) => ({
       sessions: [session, ...state.sessions],
       activeSession: session,

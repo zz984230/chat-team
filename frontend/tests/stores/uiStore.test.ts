@@ -5,9 +5,10 @@ describe('uiStore', () => {
   beforeEach(() => {
     useUiStore.setState({
       newTaskModalOpen: false,
+      newTaskRoom: null,
       agentDetailPanel: null,
       docViewer: null,
-      archiveDrawerOpen: false,
+      roomArchiveOpen: null,
     });
   });
 
@@ -15,8 +16,9 @@ describe('uiStore', () => {
     const store = useUiStore.getState();
     expect(store.newTaskModalOpen).toBe(false);
 
-    useUiStore.getState().openNewTaskModal();
+    useUiStore.getState().openNewTaskModal('rd');
     expect(useUiStore.getState().newTaskModalOpen).toBe(true);
+    expect(useUiStore.getState().newTaskRoom).toBe('rd');
 
     useUiStore.getState().closeNewTaskModal();
     expect(useUiStore.getState().newTaskModalOpen).toBe(false);

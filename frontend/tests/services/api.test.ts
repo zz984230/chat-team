@@ -32,12 +32,12 @@ describe('api', () => {
         json: () => Promise.resolve(mockSession),
       } as Response);
 
-      const result = await api.createSession({ requirement: 'test', mode: 'default' });
+      const result = await api.createSession({ requirement: 'test', mode: 'default', room: 'rd' });
       expect(result).toEqual(mockSession);
       expect(globalThis.fetch).toHaveBeenCalledWith('/api/sessions', expect.objectContaining({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ requirement: 'test', mode: 'default' }),
+        body: JSON.stringify({ requirement: 'test', mode: 'default', room: 'rd' }),
       }));
     });
   });

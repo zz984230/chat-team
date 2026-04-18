@@ -7,32 +7,34 @@ interface DocViewerTarget {
 
 interface UiState {
   newTaskModalOpen: boolean;
+  newTaskRoom: string | null;
   agentDetailPanel: string | null;
   docViewer: DocViewerTarget | null;
-  archiveDrawerOpen: boolean;
+  roomArchiveOpen: string | null;
 
-  openNewTaskModal: () => void;
+  openNewTaskModal: (roomId: string) => void;
   closeNewTaskModal: () => void;
   openAgentDetail: (agentId: string) => void;
   closeAgentDetail: () => void;
   openDocViewer: (target: DocViewerTarget) => void;
   closeDocViewer: () => void;
-  openArchiveDrawer: () => void;
-  closeArchiveDrawer: () => void;
+  openRoomArchive: (roomId: string) => void;
+  closeRoomArchive: () => void;
 }
 
 export const useUiStore = create<UiState>((set) => ({
   newTaskModalOpen: false,
+  newTaskRoom: null,
   agentDetailPanel: null,
   docViewer: null,
-  archiveDrawerOpen: false,
+  roomArchiveOpen: null,
 
-  openNewTaskModal: () => set({ newTaskModalOpen: true }),
-  closeNewTaskModal: () => set({ newTaskModalOpen: false }),
+  openNewTaskModal: (roomId) => set({ newTaskModalOpen: true, newTaskRoom: roomId }),
+  closeNewTaskModal: () => set({ newTaskModalOpen: false, newTaskRoom: null }),
   openAgentDetail: (agentId) => set({ agentDetailPanel: agentId }),
   closeAgentDetail: () => set({ agentDetailPanel: null }),
   openDocViewer: (target) => set({ docViewer: target }),
   closeDocViewer: () => set({ docViewer: null }),
-  openArchiveDrawer: () => set({ archiveDrawerOpen: true }),
-  closeArchiveDrawer: () => set({ archiveDrawerOpen: false }),
+  openRoomArchive: (roomId) => set({ roomArchiveOpen: roomId }),
+  closeRoomArchive: () => set({ roomArchiveOpen: null }),
 }));

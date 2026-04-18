@@ -27,6 +27,7 @@ export interface Session {
 export interface CreateSessionRequest {
   requirement: string;
   mode: SessionMode;
+  room: string;
   agents?: string[] | null;
   config?: { rounds: number };
 }

@@ -6,6 +6,7 @@ import type { SessionMode } from '../../types';
 
 export function NewTaskModal() {
   const open = useUiStore((s) => s.newTaskModalOpen);
+  const room = useUiStore((s) => s.newTaskRoom);
   const close = useUiStore((s) => s.closeNewTaskModal);
   const createSession = useSessionStore((s) => s.createSession);
 
@@ -17,7 +18,7 @@ export function NewTaskModal() {
     if (!requirement.trim()) return;
     setSubmitting(true);
     try {
-      await createSession(requirement.trim(), mode);
+      await createSession(requirement.trim(), mode, room ?? 'rd');
       setRequirement('');
       setMode('default');
       close();
