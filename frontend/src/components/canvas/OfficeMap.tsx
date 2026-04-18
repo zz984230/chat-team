@@ -136,7 +136,7 @@ export function OfficeMap() {
     });
     companyLabel.anchor.set(0.5);
     companyLabel.x = (mapWidth / 2) * tileWidth;
-    companyLabel.y = 0.5 * tileHeight;
+    companyLabel.y = -12;
     container.addChild(companyLabel);
 
     // 4. Draw each room
@@ -202,7 +202,7 @@ export function OfficeMap() {
         });
         label.anchor.set(0.5);
         label.x = (x + width / 2) * tileWidth;
-        label.y = (y + 0.6) * tileHeight;
+        label.y = (y + 1.5) * tileHeight;
         container.addChild(label);
       }
     }

@@ -183,7 +183,7 @@ class WorkflowEngine:
         phase = session.phases[0]
         await self._run_phase(session, phase, "请分析以下需求并输出需求澄清文档。", session_dir)
 
-        # Phase 2: architect (sequential)
+        # Phase 2: architect
         phase = session.phases[1]
         await self._run_parallel_phase(session, phase, session_dir)
 
@@ -208,7 +208,7 @@ class WorkflowEngine:
             phase = session.phases[0]
             await self._run_casual_brainstorm(session, phase, session_dir)
 
-            # Skip phase 2 (writer synthesis)
+            # Skip phase 2 (test-lead synthesis)
             if len(session.phases) > 1:
                 session.phases[1].status = PhaseStatus.SKIPPED
                 self.vault_manager.update_session(session)

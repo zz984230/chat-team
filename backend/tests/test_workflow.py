@@ -58,7 +58,7 @@ async def test_start_session_creates_and_runs(engine: WorkflowEngine):
 
 @pytest.mark.asyncio
 async def test_run_default_workflow_phases(engine: WorkflowEngine):
-    """Default workflow runs 3 phases in order."""
+    """Default workflow runs 4 phases in order."""
     req = CreateSessionRequest(requirement="test")
 
     engine.pool.submit = AsyncMock(return_value=AgentResult(
