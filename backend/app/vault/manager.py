@@ -32,6 +32,10 @@ class VaultManager:
                 agents.append(AgentDefinition(**data))
         return agents
 
+    def load_agents_by_room(self, room_id: str) -> list[AgentDefinition]:
+        """Load agent definitions filtered by room."""
+        return [a for a in self.load_agent_definitions() if a.room == room_id]
+
     def create_session(self, session: Session) -> Path:
         """Create session directory with input file and meta.yaml."""
         session_dir = self._sessions_path / session.id

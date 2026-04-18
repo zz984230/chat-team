@@ -16,11 +16,11 @@ def _create_agent_yamls(agents_dir: Path) -> None:
     """Create minimal agent YAML definitions for testing."""
     import yaml
     agents = [
-        {"id": "analyst", "name": "需求分析师", "system_prompt": "You are an analyst."},
-        {"id": "architect", "name": "架构师", "system_prompt": "You are an architect."},
-        {"id": "dev-lead", "name": "开发负责人", "system_prompt": "You are a dev lead."},
-        {"id": "test-lead", "name": "测试负责人", "system_prompt": "You are a test lead."},
-        {"id": "moderator", "name": "讨论主持人", "system_prompt": "You are a moderator."},
+        {"id": "analyst", "name": "需求分析师", "system_prompt": "You are an analyst.", "room": "rd"},
+        {"id": "architect", "name": "架构师", "system_prompt": "You are an architect.", "room": "rd"},
+        {"id": "dev-lead", "name": "开发负责人", "system_prompt": "You are a dev lead.", "room": "rd"},
+        {"id": "test-lead", "name": "测试负责人", "system_prompt": "You are a test lead.", "room": "rd"},
+        {"id": "moderator", "name": "讨论主持人", "system_prompt": "You are a moderator.", "room": "rd"},
     ]
     for agent in agents:
         path = agents_dir / f"{agent['id']}.yaml"
@@ -41,7 +41,7 @@ def engine(tmp_vault: Path) -> WorkflowEngine:
 @pytest.mark.asyncio
 async def test_start_session_creates_and_runs(engine: WorkflowEngine):
     """create_session + execute_session creates session in vault and runs it."""
-    req = CreateSessionRequest(requirement="test requirement")
+    req = CreateSessionRequest(requirement="test requirement", room="rd")
 
     # Mock pool to return success
     engine.pool.submit = AsyncMock(return_value=AgentResult(
@@ -58,7 +58,7 @@ async def test_start_session_creates_and_runs(engine: WorkflowEngine):
 @pytest.mark.asyncio
 async def test_run_default_workflow_phases(engine: WorkflowEngine):
     """Default workflow runs 4 phases in order."""
-    req = CreateSessionRequest(requirement="test")
+    req = CreateSessionRequest(requirement="test", room="rd")
 
     engine.pool.submit = AsyncMock(return_value=AgentResult(
         agent_id="agent", success=True, output_files=["out.md"], duration_ms=100,
@@ -74,7 +74,7 @@ async def test_run_default_workflow_phases(engine: WorkflowEngine):
 @pytest.mark.asyncio
 async def test_default_all_phases_sequential(engine: WorkflowEngine):
     """Default workflow runs all 4 phases sequentially."""
-    req = CreateSessionRequest(requirement="test")
+    req = CreateSessionRequest(requirement="test", room="rd")
 
     call_order = []
 
@@ -96,7 +96,7 @@ async def test_default_all_phases_sequential(engine: WorkflowEngine):
 @pytest.mark.asyncio
 async def test_pause_and_resume(engine: WorkflowEngine):
     """Can pause and resume a session."""
-    req = CreateSessionRequest(requirement="test")
+    req = CreateSessionRequest(requirement="test", room="rd")
     session = engine.create_session(req)
     await engine.execute_session(session)
 
@@ -108,7 +108,7 @@ async def test_pause_and_resume(engine: WorkflowEngine):
 @pytest.mark.asyncio
 async def test_get_session(engine: WorkflowEngine):
     """get_session returns session from memory or vault."""
-    req = CreateSessionRequest(requirement="test")
+    req = CreateSessionRequest(requirement="test", room="rd")
     created = engine.create_session(req)
     await engine.execute_session(created)
 
@@ -124,9 +124,9 @@ async def test_list_sessions(engine: WorkflowEngine):
         agent_id="a", success=True, output_files=["out.md"], duration_ms=10,
     ))
 
-    s1 = engine.create_session(CreateSessionRequest(requirement="test1"))
+    s1 = engine.create_session(CreateSessionRequest(requirement="test1", room="rd"))
     await engine.execute_session(s1)
-    s2 = engine.create_session(CreateSessionRequest(requirement="test2"))
+    s2 = engine.create_session(CreateSessionRequest(requirement="test2", room="rd"))
     await engine.execute_session(s2)
 
     sessions = engine.list_sessions()
@@ -140,6 +140,7 @@ async def test_brainstorm_token_passing_flow(engine: WorkflowEngine):
         requirement="讨论主题",
         mode=SessionMode.BRAINSTORM,
         config={"rounds": 1},
+        room="rd",
     )
 
     async def mock_moderator(session, state, session_dir):
@@ -170,6 +171,7 @@ async def test_brainstorm_skips_spoken_agents(engine: WorkflowEngine):
         requirement="test",
         mode=SessionMode.BRAINSTORM,
         config={"rounds": 1},
+        room="rd",
     )
 
     async def mock_moderator(session, state, session_dir):
@@ -197,6 +199,7 @@ async def test_brainstorm_writes_discussion_log(engine: WorkflowEngine):
         requirement="test topic",
         mode=SessionMode.BRAINSTORM,
         config={"rounds": 1},
+        room="rd",
     )
 
     async def mock_moderator(session, state, session_dir):
@@ -227,7 +230,7 @@ async def test_moderator_turn_extracts_tool_call(engine: WorkflowEngine):
     """_run_moderator_turn parses nominate_speaker tool call from stream events."""
     from app.workflow.models import DiscussionState
 
-    req = CreateSessionRequest(requirement="test", mode=SessionMode.BRAINSTORM)
+    req = CreateSessionRequest(requirement="test", mode=SessionMode.BRAINSTORM, room="rd")
     session = engine.create_session(req)
     session_dir = engine.vault_manager._sessions_path / session.id
     session_dir.mkdir(parents=True, exist_ok=True)
@@ -255,7 +258,7 @@ async def test_moderator_turn_returns_none_when_no_tool_call(engine: WorkflowEng
     """_run_moderator_turn returns None when moderator doesn't call tool."""
     from app.workflow.models import DiscussionState
 
-    req = CreateSessionRequest(requirement="test", mode=SessionMode.BRAINSTORM)
+    req = CreateSessionRequest(requirement="test", mode=SessionMode.BRAINSTORM, room="rd")
     session = engine.create_session(req)
     session_dir = engine.vault_manager._sessions_path / session.id
     session_dir.mkdir(parents=True, exist_ok=True)

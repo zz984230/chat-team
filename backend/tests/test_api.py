@@ -14,10 +14,10 @@ def _create_agent_yamls(agents_dir) -> None:
     """Create minimal agent YAML definitions for testing."""
     import yaml
     agents = [
-        {"id": "analyst", "name": "需求分析师", "system_prompt": "You are an analyst."},
-        {"id": "architect", "name": "架构师", "system_prompt": "You are an architect."},
-        {"id": "dev-lead", "name": "开发负责人", "system_prompt": "You are a dev lead."},
-        {"id": "test-lead", "name": "测试负责人", "system_prompt": "You are a test lead."},
+        {"id": "analyst", "name": "需求分析师", "system_prompt": "You are an analyst.", "room": "rd"},
+        {"id": "architect", "name": "架构师", "system_prompt": "You are an architect.", "room": "rd"},
+        {"id": "dev-lead", "name": "开发负责人", "system_prompt": "You are a dev lead.", "room": "rd"},
+        {"id": "test-lead", "name": "测试负责人", "system_prompt": "You are a test lead.", "room": "rd"},
     ]
     for agent in agents:
         path = agents_dir / f"{agent['id']}.yaml"
@@ -63,6 +63,7 @@ async def test_create_session(client: AsyncClient):
     """POST /api/sessions creates a new session."""
     resp = await client.post("/api/sessions", json={
         "requirement": "设计一个电商系统",
+        "room": "rd",
     })
     assert resp.status_code in (200, 201)
     data = resp.json()
@@ -74,7 +75,7 @@ async def test_create_session(client: AsyncClient):
 async def test_list_sessions(client: AsyncClient):
     """GET /api/sessions returns session list."""
     # Create one first
-    await client.post("/api/sessions", json={"requirement": "test"})
+    await client.post("/api/sessions", json={"requirement": "test", "room": "rd"})
 
     resp = await client.get("/api/sessions")
     assert resp.status_code == 200
@@ -86,7 +87,7 @@ async def test_list_sessions(client: AsyncClient):
 @pytest.mark.asyncio
 async def test_get_session(client: AsyncClient):
     """GET /api/sessions/{id} returns session detail."""
-    create_resp = await client.post("/api/sessions", json={"requirement": "test"})
+    create_resp = await client.post("/api/sessions", json={"requirement": "test", "room": "rd"})
     session_id = create_resp.json()["id"]
 
     resp = await client.get(f"/api/sessions/{session_id}")
@@ -104,7 +105,7 @@ async def test_get_session_not_found(client: AsyncClient):
 @pytest.mark.asyncio
 async def test_get_outputs(client: AsyncClient):
     """GET /api/sessions/{id}/outputs returns output list."""
-    create_resp = await client.post("/api/sessions", json={"requirement": "test"})
+    create_resp = await client.post("/api/sessions", json={"requirement": "test", "room": "rd"})
     session_id = create_resp.json()["id"]
 
     resp = await client.get(f"/api/sessions/{session_id}/outputs")
@@ -122,7 +123,7 @@ async def test_health_check(client: AsyncClient):
 @pytest.mark.asyncio
 async def test_delete_session(client: AsyncClient):
     """DELETE /api/sessions/{id} removes a completed session."""
-    create_resp = await client.post("/api/sessions", json={"requirement": "to delete"})
+    create_resp = await client.post("/api/sessions", json={"requirement": "to delete", "room": "rd"})
     session_id = create_resp.json()["id"]
 
     # Set status to COMPLETED so deletion is allowed
@@ -150,7 +151,7 @@ async def test_delete_session_not_found(client: AsyncClient):
 @pytest.mark.asyncio
 async def test_delete_running_session_conflict(client: AsyncClient):
     """DELETE /api/sessions/{id} returns 409 for running session."""
-    create_resp = await client.post("/api/sessions", json={"requirement": "running"})
+    create_resp = await client.post("/api/sessions", json={"requirement": "running", "room": "rd"})
     session_id = create_resp.json()["id"]
 
     from app.api.sessions import _engine
@@ -166,7 +167,7 @@ async def test_delete_running_session_conflict(client: AsyncClient):
 @pytest.mark.asyncio
 async def test_delete_paused_session_conflict(client: AsyncClient):
     """DELETE /api/sessions/{id} returns 409 for paused session."""
-    create_resp = await client.post("/api/sessions", json={"requirement": "paused"})
+    create_resp = await client.post("/api/sessions", json={"requirement": "paused", "room": "rd"})
     session_id = create_resp.json()["id"]
 
     from app.api.sessions import _engine
@@ -182,7 +183,7 @@ async def test_delete_paused_session_conflict(client: AsyncClient):
 @pytest.mark.asyncio
 async def test_delete_failed_session(client: AsyncClient):
     """DELETE /api/sessions/{id} succeeds for failed session."""
-    create_resp = await client.post("/api/sessions", json={"requirement": "failed"})
+    create_resp = await client.post("/api/sessions", json={"requirement": "failed", "room": "rd"})
     session_id = create_resp.json()["id"]
 
     from app.api.sessions import _engine
@@ -200,3 +201,32 @@ async def test_delete_session_invalid_id(client: AsyncClient):
     """DELETE /api/sessions/{id} returns 400 for invalid session ID with backslash."""
     resp = await client.request("DELETE", "/api/sessions/foo%5Cbar")
     assert resp.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_create_session_without_room(client: AsyncClient):
+    """POST /api/sessions without room returns 422."""
+    resp = await client.post("/api/sessions", json={
+        "requirement": "设计一个电商系统",
+    })
+    assert resp.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_create_session_with_room(client: AsyncClient):
+    """POST /api/sessions with room creates session successfully."""
+    resp = await client.post("/api/sessions", json={
+        "requirement": "设计一个电商系统",
+        "room": "rd",
+    })
+    assert resp.status_code in (200, 201)
+
+
+@pytest.mark.asyncio
+async def test_create_session_invalid_room(client: AsyncClient):
+    """POST /api/sessions with nonexistent room returns 422."""
+    resp = await client.post("/api/sessions", json={
+        "requirement": "test",
+        "room": "nonexistent",
+    })
+    assert resp.status_code == 422

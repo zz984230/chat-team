@@ -18,7 +18,7 @@ def test_session_status_values():
 
 
 def test_create_session_request_defaults():
-    req = CreateSessionRequest(requirement="设计一个电商系统")
+    req = CreateSessionRequest(requirement="设计一个电商系统", room="rd")
     assert req.mode == SessionMode.DEFAULT
     assert req.agents is None
     assert req.config.rounds == 1
@@ -30,6 +30,7 @@ def test_create_session_request_custom():
         mode=SessionMode.BRAINSTORM,
         agents=["analyst", "architect"],
         config={"rounds": 5},
+        room="rd",
     )
     assert req.mode == SessionMode.BRAINSTORM
     assert req.agents == ["analyst", "architect"]
@@ -44,7 +45,7 @@ def test_phase_defaults():
 
 
 def test_session_from_request():
-    req = CreateSessionRequest(requirement="test requirement")
+    req = CreateSessionRequest(requirement="test requirement", room="rd")
     session = Session.from_request(req, "20260413-153000-abc")
     assert session.id == "20260413-153000-abc"
     assert session.status == SessionStatus.CREATED
@@ -139,7 +140,7 @@ def test_discussion_state_with_turns():
 
 def test_brainstorm_session_has_single_phase():
     """Brainstorm mode creates a single discussion phase with all 4 agents."""
-    req = CreateSessionRequest(requirement="test", mode=SessionMode.BRAINSTORM)
+    req = CreateSessionRequest(requirement="test", mode=SessionMode.BRAINSTORM, room="rd")
     session = Session.from_request(req, "test-id")
     assert len(session.phases) == 1
     assert session.phases[0].name == "讨论"
@@ -148,5 +149,21 @@ def test_brainstorm_session_has_single_phase():
 
 def test_rounds_default_is_one():
     """Default rounds config is 1, not 3."""
-    req = CreateSessionRequest(requirement="test")
+    req = CreateSessionRequest(requirement="test", room="rd")
     assert req.config.rounds == 1
+
+
+def test_create_session_request_requires_room():
+    """CreateSessionRequest must include room field."""
+    import pydantic
+
+    # Missing room should raise
+    try:
+        CreateSessionRequest(requirement="test", mode="default")
+        assert False, "Should have raised validation error"
+    except pydantic.ValidationError:
+        pass
+
+    # With room should succeed
+    req = CreateSessionRequest(requirement="test", mode="default", room="rd")
+    assert req.room == "rd"

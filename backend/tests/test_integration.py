@@ -27,20 +27,24 @@ def _create_agent_yamls(agents_dir: Path) -> None:
             "id": "analyst",
             "name": "需求分析师",
             "system_prompt": "You are a requirements analyst.",
+            "room": "rd",
         },
         {
             "id": "architect",
             "name": "架构师",
             "system_prompt": "You are a software architect.",
+            "room": "rd",
         },
         {
             "name": "研究员",
             "system_prompt": "You are a researcher.",
+            "room": "rd",
         },
         {
             "id": "writer",
             "name": "整合输出师",
             "system_prompt": "You are a technical writer.",
+            "room": "rd",
         },
     ]
     agents_dir.mkdir(parents=True, exist_ok=True)
@@ -69,6 +73,7 @@ async def test_full_workflow(integration_client: AsyncClient):
     """End-to-end: submit requirement -> get completed session with outputs."""
     resp = await integration_client.post("/api/sessions", json={
         "requirement": "请用一句话描述什么是微服务架构。",
+        "room": "rd",
     })
     assert resp.status_code == 201
     data = resp.json()

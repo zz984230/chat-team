@@ -1,5 +1,6 @@
 name: "测试负责人"
 id: "test-lead"
+room: "rd"
 model: "claude-sonnet-4-20250514"
 max_turns: 25
 system_prompt: |

@@ -1,5 +1,6 @@
 name: "需求分析师"
 id: "analyst"
+room: "rd"
 model: "claude-sonnet-4-20250514"
 max_turns: 20
 system_prompt: |

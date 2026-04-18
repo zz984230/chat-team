@@ -13,9 +13,9 @@ def _create_agent_yamls(agents_dir: Path) -> None:
     """Create minimal agent YAML definitions for testing."""
     import yaml
     agents = [
-        {"id": "analyst", "name": "需求分析师", "system_prompt": "You are an analyst."},
-        {"id": "architect", "name": "架构师", "system_prompt": "You are an architect."},
-        {"id": "writer", "name": "整合输出师", "system_prompt": "You are a writer."},
+        {"id": "analyst", "name": "需求分析师", "system_prompt": "You are an analyst.", "room": "rd"},
+        {"id": "architect", "name": "架构师", "system_prompt": "You are an architect.", "room": "rd"},
+        {"id": "writer", "name": "整合输出师", "system_prompt": "You are a writer.", "room": "rd"},
     ]
     for agent in agents:
         path = agents_dir / f"{agent['id']}.yaml"
@@ -44,7 +44,7 @@ async def client_with_session(tmp_vault):
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as c:
             # Create a session
-            resp = await c.post("/api/sessions", json={"requirement": "test"})
+            resp = await c.post("/api/sessions", json={"requirement": "test", "room": "rd"})
             session_id = resp.json()["id"]
             yield c, session_id
 

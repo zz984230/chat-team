@@ -1,5 +1,6 @@
 name: "讨论主持人"
 id: "moderator"
+room: "rd"
 model: "claude-haiku-4-5-20251001"
 max_turns: 1
 system_prompt: |

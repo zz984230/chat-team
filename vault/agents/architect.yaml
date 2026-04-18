@@ -1,5 +1,6 @@
 name: "方案架构师"
 id: "architect"
+room: "rd"
 model: "claude-sonnet-4-20250514"
 max_turns: 20
 system_prompt: |

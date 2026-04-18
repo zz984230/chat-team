@@ -35,6 +35,7 @@ class CreateSessionRequest(BaseModel):
     requirement: str
     mode: SessionMode = SessionMode.DEFAULT
     agents: list[str] | None = None
+    room: str  # Required
     config: SessionConfig = Field(default_factory=SessionConfig)
 
 
@@ -93,6 +94,7 @@ class AgentDefinition(BaseModel):
     output_file: str | None = None
     output_template: str | None = None
     casual_prompt: str | None = None
+    room: str = "rd"
 
 
 class AgentResult(BaseModel):

@@ -22,6 +22,9 @@ def set_engine(engine: WorkflowEngine) -> None:
 @router.post("/sessions", status_code=201)
 async def create_session(req: CreateSessionRequest):
     assert _engine is not None
+    agents = _engine.vault_manager.load_agents_by_room(req.room)
+    if not agents:
+        raise HTTPException(status_code=422, detail=f"No agents found for room '{req.room}'")
     session = _engine.create_session(req)
     asyncio.create_task(_engine.execute_session(session))
     return session.model_dump(mode="json")

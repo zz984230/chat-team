@@ -37,7 +37,7 @@ def test_create_session_dir(tmp_vault: Path):
     """create_session_dir creates session directory and writes input file."""
     vm = VaultManager(tmp_vault)
     session = Session.from_request(
-        CreateSessionRequest(requirement="设计电商系统"),
+        CreateSessionRequest(requirement="设计电商系统", room="rd"),
         "20260413-153000-abc",
     )
     session_dir = vm.create_session(session)
@@ -50,7 +50,7 @@ def test_create_session_dir(tmp_vault: Path):
 def test_get_session(tmp_vault: Path):
     """get_session reads meta.yaml and returns Session model."""
     vm = VaultManager(tmp_vault)
-    req = CreateSessionRequest(requirement="test")
+    req = CreateSessionRequest(requirement="test", room="rd")
     session = Session.from_request(req, "20260413-153000-abc")
     vm.create_session(session)
 
@@ -71,7 +71,7 @@ def test_list_sessions(tmp_vault: Path):
     vm = VaultManager(tmp_vault)
     for i in range(3):
         session = Session.from_request(
-            CreateSessionRequest(requirement=f"test-{i}"),
+            CreateSessionRequest(requirement=f"test-{i}", room="rd"),
             f"session-{i}",
         )
         vm.create_session(session)
@@ -84,7 +84,7 @@ def test_update_session(tmp_vault: Path):
     """update_session writes updated meta.yaml."""
     vm = VaultManager(tmp_vault)
     session = Session.from_request(
-        CreateSessionRequest(requirement="test"),
+        CreateSessionRequest(requirement="test", room="rd"),
         "20260413-153000-abc",
     )
     vm.create_session(session)
@@ -100,7 +100,7 @@ def test_save_agent_output(tmp_vault: Path):
     """save_agent_output writes file content to session directory."""
     vm = VaultManager(tmp_vault)
     session = Session.from_request(
-        CreateSessionRequest(requirement="test"),
+        CreateSessionRequest(requirement="test", room="rd"),
         "20260413-153000-abc",
     )
     vm.create_session(session)
@@ -114,7 +114,7 @@ def test_list_outputs(tmp_vault: Path):
     """list_outputs returns list of output files in session directory."""
     vm = VaultManager(tmp_vault)
     session = Session.from_request(
-        CreateSessionRequest(requirement="test"),
+        CreateSessionRequest(requirement="test", room="rd"),
         "20260413-153000-abc",
     )
     vm.create_session(session)
@@ -130,7 +130,7 @@ def test_delete_session(tmp_vault: Path):
     """delete_session removes session directory entirely."""
     vm = VaultManager(tmp_vault)
     session = Session.from_request(
-        CreateSessionRequest(requirement="test"),
+        CreateSessionRequest(requirement="test", room="rd"),
         "20260413-153000-abc",
     )
     vm.create_session(session)
@@ -151,7 +151,7 @@ def test_delete_session_removes_from_list(tmp_vault: Path):
     """delete_session removes session from list_sessions results."""
     vm = VaultManager(tmp_vault)
     session = Session.from_request(
-        CreateSessionRequest(requirement="test"),
+        CreateSessionRequest(requirement="test", room="rd"),
         "20260413-153000-abc",
     )
     vm.create_session(session)
@@ -159,3 +159,31 @@ def test_delete_session_removes_from_list(tmp_vault: Path):
     assert len(vm.list_sessions()) == 1
     vm.delete_session("20260413-153000-abc")
     assert len(vm.list_sessions()) == 0
+
+
+def test_load_agents_by_room(tmp_vault):
+    """load_agents_by_room returns only agents matching the room."""
+    from app.vault.manager import VaultManager
+
+    agents_dir = tmp_vault / "agents"
+    agents_dir.mkdir(exist_ok=True)
+
+    agents = [
+        {"id": "analyst", "name": "分析师", "room": "rd", "system_prompt": "analyze"},
+        {"id": "architect", "name": "架构师", "room": "rd", "system_prompt": "design"},
+        {"id": "marketer", "name": "市场", "room": "marketing", "system_prompt": "market"},
+    ]
+    for agent in agents:
+        path = agents_dir / f"{agent['id']}.yaml"
+        path.write_text(yaml.dump(agent, allow_unicode=True), encoding="utf-8")
+
+    vm = VaultManager(tmp_vault)
+    rd_agents = vm.load_agents_by_room("rd")
+    assert len(rd_agents) == 2
+    assert all(a.room == "rd" for a in rd_agents)
+
+    marketing_agents = vm.load_agents_by_room("marketing")
+    assert len(marketing_agents) == 1
+
+    empty = vm.load_agents_by_room("nonexistent")
+    assert len(empty) == 0
