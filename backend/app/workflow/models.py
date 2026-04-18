@@ -101,3 +101,16 @@ class AgentResult(BaseModel):
     output_files: list[str] = Field(default_factory=list)
     error: str | None = None
     duration_ms: int = 0
+
+
+class DiscussionTurn(BaseModel):
+    round: int
+    agent_id: str
+    content: str
+
+
+class DiscussionState(BaseModel):
+    rounds_total: int
+    current_round: int = 1
+    spoken_this_round: list[str] = []
+    turns: list[DiscussionTurn] = []

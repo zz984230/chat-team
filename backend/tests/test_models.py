@@ -4,6 +4,7 @@ from app.workflow.models import (
     Phase, PhaseStatus,
     AgentDefinition, AgentResult,
     CreateSessionRequest,
+    DiscussionTurn, DiscussionState,
 )
 
 
@@ -110,3 +111,27 @@ def test_agent_definition_with_casual_prompt():
     }
     agent = AgentDefinition(**data)
     assert agent.casual_prompt == "轻松回应即可。"
+
+
+def test_discussion_turn():
+    turn = DiscussionTurn(round=1, agent_id="analyst", content="我认为需求的核心是...")
+    assert turn.round == 1
+    assert turn.agent_id == "analyst"
+
+
+def test_discussion_state_defaults():
+    state = DiscussionState(rounds_total=3)
+    assert state.current_round == 1
+    assert state.spoken_this_round == []
+    assert state.turns == []
+
+
+def test_discussion_state_with_turns():
+    state = DiscussionState(
+        rounds_total=2,
+        current_round=1,
+        spoken_this_round=["analyst"],
+        turns=[DiscussionTurn(round=1, agent_id="analyst", content="分析完成")],
+    )
+    assert len(state.turns) == 1
+    assert "analyst" in state.spoken_this_round
