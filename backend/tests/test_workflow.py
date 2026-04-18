@@ -1,5 +1,5 @@
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from app.workflow.engine import WorkflowEngine
@@ -20,6 +20,7 @@ def _create_agent_yamls(agents_dir: Path) -> None:
         {"id": "architect", "name": "架构师", "system_prompt": "You are an architect."},
         {"id": "dev-lead", "name": "开发负责人", "system_prompt": "You are a dev lead."},
         {"id": "test-lead", "name": "测试负责人", "system_prompt": "You are a test lead."},
+        {"id": "moderator", "name": "讨论主持人", "system_prompt": "You are a moderator."},
     ]
     for agent in agents:
         path = agents_dir / f"{agent['id']}.yaml"
@@ -219,3 +220,53 @@ async def test_brainstorm_writes_discussion_log(engine: WorkflowEngine):
     content = log_file.read_text(encoding="utf-8")
     assert "analyst" in content
     assert "analyst said hello" in content
+
+
+@pytest.mark.asyncio
+async def test_moderator_turn_extracts_tool_call(engine: WorkflowEngine):
+    """_run_moderator_turn parses nominate_speaker tool call from stream events."""
+    from app.workflow.models import DiscussionState
+
+    req = CreateSessionRequest(requirement="test", mode=SessionMode.BRAINSTORM)
+    session = engine.create_session(req)
+    session_dir = engine.vault_manager._sessions_path / session.id
+    session_dir.mkdir(parents=True, exist_ok=True)
+
+    state = DiscussionState(rounds_total=1)
+
+    with patch("app.agent.runner.AgentRunner.execute") as mock_execute:
+        from app.agent.parser import StreamEvent
+        mock_execute.return_value = [
+            StreamEvent(type="thinking", content="选择发言者..."),
+            StreamEvent(
+                type="working",
+                tool_name="nominate_speaker",
+                tool_input={"agent_id": "architect"},
+            ),
+            StreamEvent(type="completed", content="选择 architect", cost_usd=0.001),
+        ]
+
+        result = await engine._run_moderator_turn(session, state, session_dir)
+        assert result == "architect"
+
+
+@pytest.mark.asyncio
+async def test_moderator_turn_returns_none_when_no_tool_call(engine: WorkflowEngine):
+    """_run_moderator_turn returns None when moderator doesn't call tool."""
+    from app.workflow.models import DiscussionState
+
+    req = CreateSessionRequest(requirement="test", mode=SessionMode.BRAINSTORM)
+    session = engine.create_session(req)
+    session_dir = engine.vault_manager._sessions_path / session.id
+    session_dir.mkdir(parents=True, exist_ok=True)
+
+    state = DiscussionState(rounds_total=1, spoken_this_round=["analyst", "architect", "dev-lead", "test-lead"])
+
+    with patch("app.agent.runner.AgentRunner.execute") as mock_execute:
+        from app.agent.parser import StreamEvent
+        mock_execute.return_value = [
+            StreamEvent(type="completed", content="所有人都已发言", cost_usd=0.001),
+        ]
+
+        result = await engine._run_moderator_turn(session, state, session_dir)
+        assert result is None
