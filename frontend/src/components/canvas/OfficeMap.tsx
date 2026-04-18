@@ -1,8 +1,10 @@
 import { useEffect } from 'react';
-import { Graphics } from 'pixi.js';
+import { Graphics, Container } from 'pixi.js';
 import { Text } from '@pixi/text';
 import { ROOMS, MAP_CONFIG } from '../../data/mapConfig';
 import { useViewport } from './PixiCanvas';
+import { useUiStore } from '../../stores/uiStore';
+import { useSessionStore } from '../../stores/sessionStore';
 import type { FurnitureItem } from '../../data/mapConfig';
 
 const { tileWidth, tileHeight, mapWidth, mapHeight, corridorColor, wallColor, wallThickness } = MAP_CONFIG;
@@ -82,6 +84,34 @@ function drawCovered(g: Graphics, item: FurnitureItem) {
   g.lineStyle(0);
 }
 
+function drawCabinet(g: Graphics, item: FurnitureItem) {
+  const px = item.x * tileWidth;
+  const py = item.y * tileHeight;
+  const pw = item.width * tileWidth;
+  const ph = item.height * tileHeight;
+
+  // Cabinet body
+  g.beginFill(item.color);
+  g.drawRoundedRect(px + 1, py + 1, pw - 2, ph - 2, 2);
+  g.endFill();
+
+  // Drawer lines and handles
+  const drawerCount = 3;
+  const drawerH = (ph - 4) / drawerCount;
+  for (let i = 0; i < drawerCount; i++) {
+    const dy = py + 2 + i * drawerH;
+    g.lineStyle(1, 0x6b5b47, 0.5);
+    g.moveTo(px + 3, dy + drawerH - 1);
+    g.lineTo(px + pw - 3, dy + drawerH - 1);
+
+    // Handle
+    g.beginFill(0xccaa88, 0.6);
+    g.drawRoundedRect(px + pw / 2 - 3, dy + drawerH / 2 - 1, 6, 2, 1);
+    g.endFill();
+  }
+  g.lineStyle(0);
+}
+
 function drawFurniture(g: Graphics, item: FurnitureItem) {
   switch (item.type) {
     case 'desk':
@@ -102,11 +132,17 @@ function drawFurniture(g: Graphics, item: FurnitureItem) {
     case 'covered':
       drawCovered(g, item);
       break;
+    case 'cabinet':
+      drawCabinet(g, item);
+      break;
   }
 }
 
 export function OfficeMap() {
   const viewport = useViewport();
+  const openNewTask = useUiStore((s) => s.openNewTaskModal);
+  const openArchive = useUiStore((s) => s.openRoomArchive);
+  const activeSession = useSessionStore((s) => s.activeSession);
 
   useEffect(() => {
     if (!viewport) return;
@@ -207,13 +243,83 @@ export function OfficeMap() {
       }
     }
 
+    // Interactive furniture hit areas (active rooms only)
+    for (const room of ROOMS) {
+      if (room.status !== 'active') continue;
+
+      for (const item of room.furniture) {
+        if (!item.interactive) continue;
+
+        const hitArea = new Container();
+        hitArea.eventMode = 'static';
+        hitArea.cursor = 'pointer';
+
+        if (item.interactive === 'task') {
+          const cx = (item.x + item.width / 2) * tileWidth;
+          const cy = (item.y + item.height / 2) * tileHeight;
+          const rx = (item.width * tileWidth) / 2;
+          const ry = (item.height * tileHeight) / 2;
+
+          const hit = new Graphics();
+          hit.beginFill(0xffffff, 0);
+          hit.drawEllipse(cx, cy, rx, ry);
+          hit.endFill();
+          hitArea.addChild(hit);
+
+          const glow = new Graphics();
+          glow.beginFill(0xffff00, 0.15);
+          glow.drawEllipse(cx, cy, rx, ry);
+          glow.endFill();
+          glow.alpha = 0;
+          hitArea.addChild(glow);
+
+          hitArea.on('pointerover', () => { glow.alpha = 1; });
+          hitArea.on('pointerout', () => { glow.alpha = 0; });
+
+          hitArea.on('pointerdown', () => {
+            if (activeSession && activeSession.status === 'running') {
+              return;
+            }
+            openNewTask(room.id);
+          });
+        } else if (item.interactive === 'archive') {
+          const px = item.x * tileWidth;
+          const py = item.y * tileHeight;
+          const pw = item.width * tileWidth;
+          const ph = item.height * tileHeight;
+
+          const hit = new Graphics();
+          hit.beginFill(0xffffff, 0);
+          hit.drawRect(px, py, pw, ph);
+          hit.endFill();
+          hitArea.addChild(hit);
+
+          const highlight = new Graphics();
+          highlight.beginFill(0xffffff, 0.15);
+          highlight.drawRoundedRect(px + 1, py + 1, pw - 2, ph - 2, 2);
+          highlight.endFill();
+          highlight.alpha = 0;
+          hitArea.addChild(highlight);
+
+          hitArea.on('pointerover', () => { highlight.alpha = 1; });
+          hitArea.on('pointerout', () => { highlight.alpha = 0; });
+
+          hitArea.on('pointerdown', () => {
+            openArchive(room.id);
+          });
+        }
+
+        container.addChild(hitArea);
+      }
+    }
+
     viewport.addChild(container);
 
     return () => {
       viewport.removeChild(container);
       container.destroy({ children: true });
     };
-  }, [viewport]);
+  }, [viewport, openNewTask, openArchive, activeSession]);
 
   return null;
 }
