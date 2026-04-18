@@ -12,6 +12,8 @@
   },
   "dependencies": {
     "@pixi/react": "^7.1.2",
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/jest-dom": "^6.9.1",
     "ky": "^1.7.5",
     "pixi-viewport": "^5.0.2",
     "pixi.js": "^7.3.3",
