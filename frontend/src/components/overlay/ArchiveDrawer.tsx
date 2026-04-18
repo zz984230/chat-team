@@ -33,6 +33,8 @@ export function ArchiveDrawer() {
   const canDelete = (status: string) =>
     status === 'completed' || status === 'failed' || status === 'cancelled';
 
+  const uniqueOutputs = (outputs: string[]) => [...new Set(outputs)];
+
   if (!open) return null;
 
   return (
@@ -86,7 +88,7 @@ export function ArchiveDrawer() {
                         : (session.input_requirement ?? '')}
                     </p>
                     <div className="flex flex-wrap gap-1 mt-2">
-                      {session.phases.flatMap((p) => p.outputs).map((f) => (
+                      {uniqueOutputs(session.phases.flatMap((p) => p.outputs)).map((f) => (
                         <button
                           key={f}
                           className="text-xs text-blue-400 hover:text-blue-300 bg-gray-800 px-2 py-0.5 rounded"

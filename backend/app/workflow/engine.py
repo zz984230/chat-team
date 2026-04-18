@@ -57,8 +57,11 @@ class WorkflowEngine:
         Defaults to True (complex) on any failure.
         """
         import json
+        import logging
         import os
         import sys
+
+        logger = logging.getLogger(__name__)
 
         claude_cmd = "claude.cmd" if sys.platform == "win32" else "claude"
         classify_prompt = (
@@ -70,10 +73,19 @@ class WorkflowEngine:
         cmd = [
             claude_cmd, "-p", "-",
             "--output-format", "stream-json",
+            "--verbose",
             "--model", "claude-haiku-4-5-20251001",
             "--max-turns", "1",
         ]
         env = dict(os.environ)
+        if sys.platform == "win32":
+            import shutil
+            git_exe = shutil.which("git")
+            if git_exe:
+                git_root = Path(git_exe).parent.parent.parent
+                git_bash = git_root / "bin" / "bash.exe"
+                if git_bash.exists():
+                    env["CLAUDE_CODE_GIT_BASH_PATH"] = str(git_bash)
         if self.api_key:
             env["ANTHROPIC_API_KEY"] = self.api_key
         if self.api_base_url:
@@ -92,25 +104,28 @@ class WorkflowEngine:
             stdout, stderr = proc.communicate(
                 input=classify_prompt.encode("utf-8"), timeout=10,
             )
-            return stdout.decode("utf-8", errors="replace")
+            return stdout.decode("utf-8", errors="replace"), stderr.decode("utf-8", errors="replace")
 
         try:
-            stdout = await loop.run_in_executor(None, _run)
+            stdout, stderr = await loop.run_in_executor(None, _run)
+            logger.info("[CLASSIFY] stdout: %s", stdout[:500])
+            logger.info("[CLASSIFY] stderr: %s", stderr[:500] if stderr else "(empty)")
             for line in stdout.strip().splitlines():
                 try:
                     data = json.loads(line.strip())
                     if data.get("type") == "result" and data.get("subtype") == "success":
                         result_text = (data.get("result") or "").strip().upper()
+                        logger.info("[CLASSIFY] LLM result: %s", result_text[:200])
                         if "SIMPLE" in result_text:
                             return False
                         if "COMPLEX" in result_text:
                             return True
                 except (json.JSONDecodeError, KeyError):
                     continue
+            logger.warning("[CLASSIFY] No clear SIMPLE/COMPLEX found, defaulting to complex")
             return True  # default to complex if no clear answer
         except Exception:
-            import logging
-            logging.getLogger(__name__).warning("Input classification failed, defaulting to complex")
+            logger.warning("Input classification failed, defaulting to complex", exc_info=True)
             return True
 
     def _get_agent_def(self, agent_id: str) -> AgentDefinition:

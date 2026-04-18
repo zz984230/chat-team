@@ -115,15 +115,22 @@ class AgentRunner:
         )
 
     async def collect_outputs(self) -> list[str]:
-        """Copy output files from work dir to session dir."""
+        """Copy output files from work dir to session dir.
+
+        Excludes files that were provided as inputs (copied from session_dir
+        during prepare) to prevent duplicates across phases.
+        """
         output_files: list[str] = []
         if not self.config.work_dir.exists():
             return output_files
 
+        input_names = {f.name for f in self.config.input_files if f.exists()}
+
         for f in self.config.work_dir.iterdir():
             if f.is_file() and f.suffix in (".md", ".yaml", ".json", ".txt"):
                 shutil.copy2(f, self.config.session_dir / f.name)
-                output_files.append(f.name)
+                if f.name not in input_names:
+                    output_files.append(f.name)
 
         return output_files
 
