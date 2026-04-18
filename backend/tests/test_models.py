@@ -21,7 +21,7 @@ def test_create_session_request_defaults():
     req = CreateSessionRequest(requirement="设计一个电商系统")
     assert req.mode == SessionMode.DEFAULT
     assert req.agents is None
-    assert req.config.rounds == 3
+    assert req.config.rounds == 1
 
 
 def test_create_session_request_custom():
@@ -135,3 +135,18 @@ def test_discussion_state_with_turns():
     )
     assert len(state.turns) == 1
     assert "analyst" in state.spoken_this_round
+
+
+def test_brainstorm_session_has_single_phase():
+    """Brainstorm mode creates a single discussion phase with all 4 agents."""
+    req = CreateSessionRequest(requirement="test", mode=SessionMode.BRAINSTORM)
+    session = Session.from_request(req, "test-id")
+    assert len(session.phases) == 1
+    assert session.phases[0].name == "讨论"
+    assert set(session.phases[0].agents) == {"analyst", "architect", "dev-lead", "test-lead"}
+
+
+def test_rounds_default_is_one():
+    """Default rounds config is 1, not 3."""
+    req = CreateSessionRequest(requirement="test")
+    assert req.config.rounds == 1

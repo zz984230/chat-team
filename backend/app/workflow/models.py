@@ -28,7 +28,7 @@ class PhaseStatus(StrEnum):
 
 
 class SessionConfig(BaseModel):
-    rounds: int = 3
+    rounds: int = 1
 
 
 class CreateSessionRequest(BaseModel):
@@ -60,6 +60,7 @@ class Session(BaseModel):
     updated_at: datetime = Field(default_factory=datetime.now)
     input_requirement: str = ""
     phases: list[Phase] = Field(default_factory=list)
+    config_rounds: int = 1
 
     @classmethod
     def from_request(cls, req: CreateSessionRequest, session_id: str) -> "Session":
@@ -71,16 +72,15 @@ class Session(BaseModel):
                 Phase(id=4, name="测试计划", agents=["test-lead"]),
             ]
         else:
-            agents = req.agents or ["analyst", "architect"]
             phases = [
-                Phase(id=1, name="头脑风暴", agents=agents),
-                Phase(id=2, name="整合输出", agents=["test-lead"]),
+                Phase(id=1, name="讨论", agents=["analyst", "architect", "dev-lead", "test-lead"]),
             ]
         return cls(
             id=session_id,
             mode=req.mode,
             input_requirement=req.requirement,
             phases=phases,
+            config_rounds=req.config.rounds,
         )
 
 
