@@ -11,13 +11,10 @@ import { ROOMS, MAP_CONFIG } from '../../data/mapConfig';
 
 const FLIGHT_DURATION = 800;
 
-const ARCHIVE_CENTER = (() => {
-  const archive = ROOMS.find((r) => r.id === 'archive')!;
-  return {
-    x: (archive.bounds.x + archive.bounds.width / 2) * MAP_CONFIG.tileWidth,
-    y: (archive.bounds.y + archive.bounds.height / 2) * MAP_CONFIG.tileHeight,
-  };
-})();
+const ARCHIVE_CENTER = {
+  x: (MAP_CONFIG.mapWidth / 2) * MAP_CONFIG.tileWidth,
+  y: (MAP_CONFIG.mapHeight - 2) * MAP_CONFIG.tileHeight,
+};
 
 // ---------------------------------------------------------------------------
 // Helpers
