@@ -179,23 +179,21 @@ class WorkflowEngine:
         """Run the default 4-phase workflow."""
         session_dir = self.vault_manager._sessions_path / session.id
 
-        # Phase 1: analyst (sequential)
+        # Phase 1: analyst
         phase = session.phases[0]
         await self._run_phase(session, phase, "请分析以下需求并输出需求澄清文档。", session_dir)
 
         # Phase 2: architect
         phase = session.phases[1]
-        await self._run_parallel_phase(session, phase, session_dir)
+        await self._run_phase(session, phase, "请基于需求分析设计技术方案。", session_dir)
 
-        # Phase 3: dev-lead (sequential)
+        # Phase 3: dev-lead
         phase = session.phases[2]
-        task = "请阅读所有前置文档，将技术方案分解为开发任务。"
-        await self._run_phase(session, phase, task, session_dir)
+        await self._run_phase(session, phase, "请阅读所有前置文档，将技术方案分解为开发任务。", session_dir)
 
-        # Phase 4: test-lead (sequential)
+        # Phase 4: test-lead
         phase = session.phases[3]
-        task = "请阅读所有前置文档，制定测试计划。"
-        await self._run_phase(session, phase, task, session_dir)
+        await self._run_phase(session, phase, "请阅读所有前置文档，制定测试计划。", session_dir)
 
     async def _run_brainstorm_workflow(self, session: Session) -> None:
         """Run brainstorm mode with input classification."""

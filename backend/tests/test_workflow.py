@@ -73,15 +73,14 @@ async def test_run_default_workflow_phases(engine: WorkflowEngine):
 
 
 @pytest.mark.asyncio
-async def test_phase_2_runs_parallel(engine: WorkflowEngine):
-    """Phase 2 runs architect agent."""
+async def test_default_all_phases_sequential(engine: WorkflowEngine):
+    """Default workflow runs all 4 phases sequentially."""
     req = CreateSessionRequest(requirement="test")
 
     call_order = []
 
     async def track_submit(runner, task, event_callback=None):
         call_order.append(runner.agent_def.id)
-        await asyncio.sleep(0.05)  # simulate work
         return AgentResult(
             agent_id=runner.agent_def.id, success=True,
             output_files=["out.md"], duration_ms=50,
@@ -92,11 +91,7 @@ async def test_phase_2_runs_parallel(engine: WorkflowEngine):
     session = engine.create_session(req)
     await engine.execute_session(session)
 
-    # Phase 2 agents should overlap (not strictly sequential)
-    # Both should appear before test-lead
-    assert "architect" in call_order
-    assert "test-lead" in call_order
-    assert call_order.index("test-lead") > call_order.index("architect")
+    assert call_order == ["analyst", "architect", "dev-lead", "test-lead"]
 
 
 @pytest.mark.asyncio
