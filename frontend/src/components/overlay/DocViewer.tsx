@@ -116,6 +116,8 @@ export function DocViewer() {
         <div className="flex-1 overflow-y-auto p-6 prose prose-sm max-w-none">
           {loading ? (
             <p className="text-gray-400">加载中...</p>
+          ) : target.filename === '01-讨论记录.md' && content ? (
+            <DiscussionCards data={parseDiscussion(content)} />
           ) : (
             <ReactMarkdown>{content ?? ''}</ReactMarkdown>
           )}
