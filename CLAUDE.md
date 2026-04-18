@@ -195,3 +195,4 @@ cd frontend && npm run test
 - 前端采用双层渲染架构：PixiJS Canvas 处理性能敏感的可视化，HTML Overlay 处理 UI 交互
 - 前端 API 通过 Vite proxy 统一代理到后端，避免跨域问题
 - VaultManager 读取 meta.yaml 时兼容 UTF-8 和 GBK 编码（Windows 中文环境下历史文件可能为 GBK 编码）
+- **Windows 上 uvicorn `--reload` 不可靠**：文件变更后自动热重载经常不生效（即使 WatchFiles 检测到变更，子进程仍可能运行旧代码）。修改后端代码后，务必手动杀掉所有 Python/uvicorn 进程（`taskkill`）并删除 `__pycache__`，再重新启动服务器，否则修改不会生效。
