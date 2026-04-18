@@ -92,6 +92,8 @@ cd frontend && npm run test
 - **`PixiCanvas.tsx`** — 全屏 PixiJS 舞台，响应式尺寸
 - **`OfficeMap.tsx`** — 办公室地图渲染（走廊、房间、墙壁、标签），支持点击交互
 - **`AgentSprite.tsx`** — 智能体精灵（彩色圆点），支持 idle/walking/working/thinking 动画状态
+- **`CelebrationEffect.tsx`** — 任务完成时的庆祝动画效果
+- **`FlyingDocument.tsx`** — 文档生成时的飞入动画效果
 
 **Overlay 层**（`components/overlay/`）：
 - **`NewTaskModal.tsx`** — 新建任务提交界面
@@ -118,7 +120,7 @@ cd frontend && npm run test
 - **`spritesheets/`** — 精灵帧动画定义
 
 **服务**（`services/`）：
-- **`api.ts`** — 基于 ky 的 HTTP 客户端，封装所有后端 API 调用
+- **`api.ts`** — 基于原生 fetch 的 HTTP 客户端，封装所有后端 API 调用
 
 ### 智能体定义
 
@@ -131,6 +133,7 @@ cd frontend && npm run test
 - `GET /api/sessions/{id}/outputs` / `GET /api/sessions/{id}/outputs/{filename}` — 访问智能体输出
 - `GET /api/sessions/{id}/workflow` — 阶段级状态
 - `POST /api/sessions/{id}/pause|resume|cancel` — Session 控制
+- `DELETE /api/sessions/{id}` — 删除已完成/失败/取消的 session
 - `GET /api/agents` / `GET /api/agents/{id}` — 列出/获取智能体定义
 - `WS /api/ws/sessions/{id}` — 实时 session 事件流
 
@@ -158,7 +161,7 @@ cd frontend && npm run test
 | 样式 | — | TailwindCSS |
 | 状态 | Pydantic 模型 | Zustand |
 | 实时 | WebSocket | WebSocket + EventSource |
-| HTTP | FastAPI 路由 | ky |
+| HTTP | FastAPI 路由 | fetch |
 | 测试 | pytest + pytest-asyncio + httpx | Vitest + Testing Library |
 | 可视化 | — | PixiJS + pixi-viewport |
 
@@ -191,3 +194,4 @@ cd frontend && npm run test
 - Engine 依赖注入使用模块级全局变量（在应用启动时设置），而非 FastAPI 的依赖注入系统
 - 前端采用双层渲染架构：PixiJS Canvas 处理性能敏感的可视化，HTML Overlay 处理 UI 交互
 - 前端 API 通过 Vite proxy 统一代理到后端，避免跨域问题
+- VaultManager 读取 meta.yaml 时兼容 UTF-8 和 GBK 编码（Windows 中文环境下历史文件可能为 GBK 编码）

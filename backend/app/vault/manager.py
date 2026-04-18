@@ -50,7 +50,7 @@ class VaultManager:
         meta_path = self._sessions_path / session_id / "meta.yaml"
         if not meta_path.exists():
             return None
-        data = yaml.safe_load(meta_path.read_text(encoding="utf-8"))
+        data = self._read_yaml(meta_path)
         return Session(**data) if data else None
 
     def list_sessions(self) -> list[Session]:
@@ -59,7 +59,7 @@ class VaultManager:
         if not self._sessions_path.exists():
             return sessions
         for meta_path in self._sessions_path.glob("*/meta.yaml"):
-            data = yaml.safe_load(meta_path.read_text(encoding="utf-8"))
+            data = self._read_yaml(meta_path)
             if data:
                 sessions.append(Session(**data))
         sessions.sort(key=lambda s: s.created_at, reverse=True)
@@ -102,6 +102,17 @@ class VaultManager:
             return False
         shutil.rmtree(session_dir)
         return True
+
+    @staticmethod
+    def _read_yaml(path: Path) -> dict | None:
+        """Read a YAML file, trying UTF-8 then GBK (for legacy Windows files)."""
+        for enc in ("utf-8", "gbk"):
+            try:
+                text = path.read_text(encoding=enc)
+                return yaml.safe_load(text)
+            except (UnicodeDecodeError, UnicodeError):
+                continue
+        return None
 
     def _write_meta(self, session_dir: Path, session: Session) -> None:
         """Serialize session to meta.yaml."""
