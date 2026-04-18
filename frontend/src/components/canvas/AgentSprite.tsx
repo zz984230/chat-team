@@ -19,7 +19,8 @@ import { spritesheetData as f6Data } from '../../data/spritesheets/f6';
 const AGENT_NAMES: Record<string, string> = {
   analyst: '需求分析师',
   architect: '方案架构师',
-  writer: '方案撰写员',
+  'dev-lead': '开发负责人',
+  'test-lead': '测试负责人',
 };
 
 const SPRITESHEET_DATA_MAP: Record<string, typeof f1Data> = {
