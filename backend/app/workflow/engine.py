@@ -1,5 +1,4 @@
 import asyncio
-import subprocess
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -49,84 +48,6 @@ class WorkflowEngine:
         """Load agent definitions from vault."""
         for agent in self.vault_manager.load_agent_definitions():
             self._agent_defs[agent.id] = agent
-
-    async def _classify_input(self, requirement: str) -> bool:
-        """Classify input as complex (True) or simple (False).
-
-        Uses claude CLI with haiku model for fast, cheap classification.
-        Defaults to True (complex) on any failure.
-        """
-        import json
-        import logging
-        import os
-        import sys
-
-        logger = logging.getLogger(__name__)
-
-        claude_cmd = "claude.cmd" if sys.platform == "win32" else "claude"
-        classify_prompt = (
-            "判断以下输入是否需要深入分析和多轮讨论。"
-            "如果只是打招呼、简单提问、闲聊，回复 SIMPLE。"
-            "如果是复杂需求、技术方案、需要分析的议题，回复 COMPLEX。"
-            f"\n\n输入：{requirement}"
-        )
-        cmd = [
-            claude_cmd, "-p", "-",
-            "--output-format", "stream-json",
-            "--verbose",
-            "--model", "claude-haiku-4-5-20251001",
-            "--max-turns", "1",
-        ]
-        env = dict(os.environ)
-        if sys.platform == "win32":
-            import shutil
-            git_exe = shutil.which("git")
-            if git_exe:
-                git_root = Path(git_exe).parent.parent.parent
-                git_bash = git_root / "bin" / "bash.exe"
-                if git_bash.exists():
-                    env["CLAUDE_CODE_GIT_BASH_PATH"] = str(git_bash)
-        if self.api_key:
-            env["ANTHROPIC_API_KEY"] = self.api_key
-        if self.api_base_url:
-            env["ANTHROPIC_BASE_URL"] = self.api_base_url
-
-        loop = asyncio.get_event_loop()
-
-        def _run():
-            proc = subprocess.Popen(
-                cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                stdin=subprocess.PIPE,
-                env=env,
-            )
-            stdout, stderr = proc.communicate(
-                input=classify_prompt.encode("utf-8"), timeout=10,
-            )
-            return stdout.decode("utf-8", errors="replace"), stderr.decode("utf-8", errors="replace")
-
-        try:
-            stdout, stderr = await loop.run_in_executor(None, _run)
-            logger.info("[CLASSIFY] stdout: %s", stdout[:500])
-            logger.info("[CLASSIFY] stderr: %s", stderr[:500] if stderr else "(empty)")
-            for line in stdout.strip().splitlines():
-                try:
-                    data = json.loads(line.strip())
-                    if data.get("type") == "result" and data.get("subtype") == "success":
-                        result_text = (data.get("result") or "").strip().upper()
-                        logger.info("[CLASSIFY] LLM result: %s", result_text[:200])
-                        if "SIMPLE" in result_text:
-                            return False
-                        if "COMPLEX" in result_text:
-                            return True
-                except (json.JSONDecodeError, KeyError):
-                    continue
-            logger.warning("[CLASSIFY] No clear SIMPLE/COMPLEX found, defaulting to complex")
-            return True  # default to complex if no clear answer
-        except Exception:
-            logger.warning("Input classification failed, defaulting to complex", exc_info=True)
-            return True
 
     def _get_agent_def(self, agent_id: str) -> AgentDefinition:
         """Get agent definition by ID. Raises KeyError if not found."""
@@ -196,80 +117,139 @@ class WorkflowEngine:
         await self._run_phase(session, phase, "请阅读所有前置文档，制定测试计划。", session_dir)
 
     async def _run_brainstorm_workflow(self, session: Session) -> None:
-        """Run brainstorm mode with input classification."""
+        """Run brainstorm mode with token-passing discussion."""
+        from app.workflow.models import DiscussionState, DiscussionTurn
+
         session_dir = self.vault_manager._sessions_path / session.id
-
-        is_complex = await self._classify_input(session.input_requirement)
-
-        if not is_complex:
-            # Simple input: single-round casual response from all agents
-            phase = session.phases[0]
-            await self._run_casual_brainstorm(session, phase, session_dir)
-
-            # Skip phase 2 (test-lead synthesis)
-            if len(session.phases) > 1:
-                session.phases[1].status = PhaseStatus.SKIPPED
-                self.vault_manager.update_session(session)
-        else:
-            # Complex input: full multi-round brainstorm
-            rounds = 3
-            phase = session.phases[0]
-            for round_num in range(1, rounds + 1):
-                await self._run_parallel_phase(
-                    session, phase, session_dir,
-                    task_prefix=f"第 {round_num}/{rounds} 轮讨论。请基于已有信息提出你的观点。",
-                )
-
-            # Final synthesis
-            phase = session.phases[1]
-            await self._run_phase(
-                session, phase,
-                "请阅读所有讨论内容，汇总输出综合报告。",
-                session_dir,
-            )
-
-    async def _run_casual_brainstorm(self, session: Session, phase: Any, session_dir: Path) -> None:
-        """Run casual single-round brainstorm for simple inputs."""
+        phase = session.phases[0]
         phase.status = PhaseStatus.RUNNING
         phase.started_at = datetime.now()
         self.vault_manager.update_session(session)
         await self.ws_manager.emit(session.id, "phase:started", phase=phase.id)
 
-        task = f"请以你的角色身份直接回应以下内容：\n\n{session.input_requirement}"
+        state = DiscussionState(rounds_total=session.config_rounds)
 
-        async def run_single(agent_id: str) -> AgentResult:
-            agent_def = self._get_agent_def(agent_id)
-            config = AgentRunConfig(
-                work_dir=Path(f"{self.work_dir}/{session.id}/{agent_id}"),
-                session_dir=session_dir,
-                input_files=[],
-                api_key=self.api_key,
-                api_base_url=self.api_base_url,
-                allowed_tools=self.allowed_tools,
-                use_casual=True,
-            )
-            runner = AgentRunner(agent_def, config)
-            return await self.pool.submit(runner, task)
+        for round_num in range(1, state.rounds_total + 1):
+            state.current_round = round_num
+            state.spoken_this_round = []
 
-        results = await asyncio.gather(
-            *[run_single(aid) for aid in phase.agents],
-            return_exceptions=True,
-        )
+            while True:
+                next_agent = await self._run_moderator_turn(session, state, session_dir)
+                if next_agent is None:
+                    break
 
-        added: list[str] = []
-        success_count = 0
-        for r in results:
-            if isinstance(r, AgentResult):
-                added.extend(self._add_outputs(phase, r.output_files))
-                if r.success:
-                    success_count += 1
+                content = await self._run_agent_turn(session, state, next_agent, session_dir)
+                turn = DiscussionTurn(round=round_num, agent_id=next_agent, content=content)
+                state.turns.append(turn)
+                state.spoken_this_round.append(next_agent)
 
-        phase.status = PhaseStatus.COMPLETED if success_count > 0 else PhaseStatus.FAILED
+        # Write combined discussion log
+        log_path = session_dir / "01-讨论记录.md"
+        lines = [f"# 讨论记录\n\n## 原始需求\n{session.input_requirement}\n"]
+        for t in state.turns:
+            lines.append(f"\n## {t.agent_id}（第{t.round}轮）\n\n{t.content}\n")
+        log_path.write_text("\n".join(lines), encoding="utf-8")
+
+        added = self._add_outputs(phase, ["01-讨论记录.md"])
+        phase.status = PhaseStatus.COMPLETED
         phase.completed_at = datetime.now()
         self.vault_manager.update_session(session)
-        await self.ws_manager.emit(
-            session.id, "phase:completed", phase=phase.id, outputs=added,
+        await self.ws_manager.emit(session.id, "phase:completed", phase=phase.id, outputs=added)
+
+    async def _run_moderator_turn(
+        self, session: Session, state: "DiscussionState", session_dir: Path,
+    ) -> str | None:
+        """Run moderator to select next speaker. Returns agent_id or None."""
+        from app.workflow.models import DiscussionState as DS
+
+        moderator_def = self._get_agent_def("moderator")
+
+        turns_summary = ""
+        if state.turns:
+            turns_summary = "\n\n## 已有发言记录\n"
+            for t in state.turns:
+                turns_summary += f"\n### {t.agent_id}（第{t.round}轮）\n{t.content}\n"
+
+        spoken_str = ", ".join(state.spoken_this_round) if state.spoken_this_round else "无"
+
+        task = (
+            f"## 讨论信息\n"
+            f"当前第 {state.current_round}/{state.rounds_total} 轮\n"
+            f"本轮已发言：{spoken_str}\n"
+            f"原始需求：{session.input_requirement}\n"
+            f"{turns_summary}\n\n"
+            f"请选择下一个发言者。"
         )
+
+        config = AgentRunConfig(
+            work_dir=Path(f"{self.work_dir}/{session.id}/moderator"),
+            session_dir=session_dir,
+            input_files=[],
+            api_key=self.api_key,
+            api_base_url=self.api_base_url,
+            allowed_tools=["nominate_speaker"],
+        )
+        runner = AgentRunner(moderator_def, config)
+
+        try:
+            await runner.prepare()
+            events = await runner.execute(task)
+
+            for event in reversed(events):
+                if (
+                    event.type == "working"
+                    and event.tool_name == "nominate_speaker"
+                    and event.tool_input
+                ):
+                    agent_id = event.tool_input.get("agent_id")
+                    if agent_id and agent_id not in state.spoken_this_round:
+                        return agent_id
+
+            return None
+        finally:
+            await runner.cleanup()
+
+    async def _run_agent_turn(
+        self, session: Session, state: "DiscussionState",
+        agent_id: str, session_dir: Path,
+    ) -> str:
+        """Run a single agent turn and return the spoken content."""
+        agent_def = self._get_agent_def(agent_id)
+
+        turns_summary = ""
+        if state.turns:
+            turns_summary = "\n\n## 已有发言记录\n"
+            for t in state.turns:
+                turns_summary += f"\n### {t.agent_id}（第{t.round}轮）\n{t.content}\n"
+
+        task = (
+            f"## 讨论主题\n{session.input_requirement}\n"
+            f"{turns_summary}\n\n"
+            f"请以你的角色身份发表观点。"
+        )
+
+        config = AgentRunConfig(
+            work_dir=Path(f"{self.work_dir}/{session.id}/{agent_id}"),
+            session_dir=session_dir,
+            input_files=[],
+            api_key=self.api_key,
+            api_base_url=self.api_base_url,
+            allowed_tools=self.allowed_tools,
+            use_casual=True,
+        )
+        runner = AgentRunner(agent_def, config)
+
+        try:
+            await runner.prepare()
+            events = await runner.execute(task)
+
+            final = next(
+                (e for e in reversed(events) if e.type == "completed" and e.content),
+                None,
+            )
+            return final.content if final else ""
+        finally:
+            await runner.cleanup()
 
     async def _run_phase(
         self, session: Session, phase: Any, task: str, session_dir: Path,

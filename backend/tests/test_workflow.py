@@ -1,7 +1,5 @@
-import asyncio
-import subprocess
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from app.workflow.engine import WorkflowEngine
@@ -135,82 +133,89 @@ async def test_list_sessions(engine: WorkflowEngine):
 
 
 @pytest.mark.asyncio
-async def test_classify_input_returns_true_for_complex(engine: WorkflowEngine):
-    """Complex input is classified as needing full workflow."""
-    with patch("app.workflow.engine.subprocess.Popen") as mock_popen:
-        proc = MagicMock()
-        proc.communicate.return_value = (b'{"type":"result","subtype":"success","result":"COMPLEX"}', b"")
-        proc.returncode = 0
-        mock_popen.return_value = proc
-        result = await engine._classify_input("设计一个电商系统，需要支持多商户和支付功能")
-        assert result is True
+async def test_brainstorm_token_passing_flow(engine: WorkflowEngine):
+    """Brainstorm mode uses token-passing: moderator selects speakers."""
+    req = CreateSessionRequest(
+        requirement="讨论主题",
+        mode=SessionMode.BRAINSTORM,
+        config={"rounds": 1},
+    )
 
+    async def mock_moderator(session, state, session_dir):
+        agents = ["analyst", "architect", "dev-lead", "test-lead"]
+        if len(state.spoken_this_round) < len(agents):
+            return agents[len(state.spoken_this_round)]
+        return None
 
-@pytest.mark.asyncio
-async def test_classify_input_returns_false_for_simple(engine: WorkflowEngine):
-    """Simple input is classified as not needing full workflow."""
-    with patch("app.workflow.engine.subprocess.Popen") as mock_popen:
-        proc = MagicMock()
-        proc.communicate.return_value = (b'{"type":"result","subtype":"success","result":"SIMPLE"}', b"")
-        proc.returncode = 0
-        mock_popen.return_value = proc
-        result = await engine._classify_input("你好")
-        assert result is False
+    engine._run_moderator_turn = mock_moderator
 
+    async def mock_agent_turn(session, state, agent_id, session_dir):
+        return f"{agent_id} says something"
 
-@pytest.mark.asyncio
-async def test_classify_input_defaults_to_complex_on_error(engine: WorkflowEngine):
-    """Classification failure defaults to complex (full workflow)."""
-    with patch("app.workflow.engine.subprocess.Popen") as mock_popen:
-        mock_popen.side_effect = Exception("claude CLI not found")
-        result = await engine._classify_input("你好")
-        assert result is True
-
-
-@pytest.mark.asyncio
-async def test_brainstorm_simple_input_runs_casual_flow(engine: WorkflowEngine):
-    """Simple input triggers casual flow: all agents in one round, phase 2 skipped."""
-    req = CreateSessionRequest(requirement="你好", mode=SessionMode.BRAINSTORM)
-
-    configs_seen = []
-
-    async def capture_submit(runner, task, event_callback=None):
-        configs_seen.append(runner.config.use_casual)
-        return AgentResult(
-            agent_id=runner.agent_def.id, success=True,
-            output_files=["out.md"], duration_ms=100,
-        )
-
-    engine.pool.submit = capture_submit
+    engine._run_agent_turn = mock_agent_turn
 
     session = engine.create_session(req)
-
-    with patch.object(engine, "_classify_input", return_value=False):
-        await engine.execute_session(session)
+    await engine.execute_session(session)
 
     assert session.status == SessionStatus.COMPLETED
+    assert len(session.phases) == 1
     assert session.phases[0].status == PhaseStatus.COMPLETED
-    assert session.phases[1].status == PhaseStatus.SKIPPED
-    # All agents in phase 1 were run
-    assert len(configs_seen) == len(session.phases[0].agents)
-    # All runners had use_casual=True
-    assert all(c is True for c in configs_seen)
 
 
 @pytest.mark.asyncio
-async def test_brainstorm_complex_input_runs_full_flow(engine: WorkflowEngine):
-    """Complex input triggers full multi-round brainstorm flow."""
-    req = CreateSessionRequest(requirement="设计电商系统", mode=SessionMode.BRAINSTORM)
+async def test_brainstorm_skips_spoken_agents(engine: WorkflowEngine):
+    """Moderator will not re-select already-spoken agents."""
+    req = CreateSessionRequest(
+        requirement="test",
+        mode=SessionMode.BRAINSTORM,
+        config={"rounds": 1},
+    )
 
-    engine.pool.submit = AsyncMock(return_value=AgentResult(
-        agent_id="agent", success=True, output_files=["out.md"], duration_ms=100,
-    ))
+    async def mock_moderator(session, state, session_dir):
+        if "analyst" not in state.spoken_this_round:
+            return "analyst"
+        return None
+
+    engine._run_moderator_turn = mock_moderator
+
+    async def mock_agent_turn(session, state, agent_id, session_dir):
+        return f"{agent_id} content"
+
+    engine._run_agent_turn = mock_agent_turn
 
     session = engine.create_session(req)
-
-    with patch.object(engine, "_classify_input", return_value=True):
-        await engine.execute_session(session)
+    await engine.execute_session(session)
 
     assert session.status == SessionStatus.COMPLETED
-    assert session.phases[0].status == PhaseStatus.COMPLETED
-    assert session.phases[1].status == PhaseStatus.COMPLETED
+
+
+@pytest.mark.asyncio
+async def test_brainstorm_writes_discussion_log(engine: WorkflowEngine):
+    """Brainstorm writes 01-讨论记录.md to session dir."""
+    req = CreateSessionRequest(
+        requirement="test topic",
+        mode=SessionMode.BRAINSTORM,
+        config={"rounds": 1},
+    )
+
+    async def mock_moderator(session, state, session_dir):
+        if not state.spoken_this_round:
+            return "analyst"
+        return None
+
+    engine._run_moderator_turn = mock_moderator
+
+    async def mock_agent_turn(session, state, agent_id, session_dir):
+        return "analyst said hello"
+
+    engine._run_agent_turn = mock_agent_turn
+
+    session = engine.create_session(req)
+    await engine.execute_session(session)
+
+    session_dir = engine.vault_manager._sessions_path / session.id
+    log_file = session_dir / "01-讨论记录.md"
+    assert log_file.exists()
+    content = log_file.read_text(encoding="utf-8")
+    assert "analyst" in content
+    assert "analyst said hello" in content
