@@ -176,7 +176,7 @@ class WorkflowEngine:
         return session
 
     async def _run_default_workflow(self, session: Session) -> None:
-        """Run the default 3-phase workflow."""
+        """Run the default 4-phase workflow."""
         session_dir = self.vault_manager._sessions_path / session.id
 
         # Phase 1: analyst (sequential)
@@ -187,9 +187,14 @@ class WorkflowEngine:
         phase = session.phases[1]
         await self._run_parallel_phase(session, phase, session_dir)
 
-        # Phase 3: writer (sequential)
+        # Phase 3: dev-lead (sequential)
         phase = session.phases[2]
-        task = "请阅读所有前置文档，整合输出最终方案。"
+        task = "请阅读所有前置文档，将技术方案分解为开发任务。"
+        await self._run_phase(session, phase, task, session_dir)
+
+        # Phase 4: test-lead (sequential)
+        phase = session.phases[3]
+        task = "请阅读所有前置文档，制定测试计划。"
         await self._run_phase(session, phase, task, session_dir)
 
     async def _run_brainstorm_workflow(self, session: Session) -> None:
