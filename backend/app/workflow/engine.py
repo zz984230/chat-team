@@ -160,8 +160,6 @@ class WorkflowEngine:
         self, session: Session, state: "DiscussionState", session_dir: Path,
     ) -> str | None:
         """Run moderator to select next speaker. Returns agent_id or None."""
-        from app.workflow.models import DiscussionState as DS
-
         moderator_def = self._get_agent_def("moderator")
 
         turns_summary = ""
