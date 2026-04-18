@@ -2,10 +2,11 @@ import { useState } from 'react';
 import { useUiStore } from '../../stores/uiStore';
 import { useSessionStore } from '../../stores/sessionStore';
 import { useSessionList } from '../../hooks/useSession';
+import { ROOMS } from '../../data/mapConfig';
 import { Modal } from '../ui/Modal';
 
 export function ArchiveDrawer() {
-  const open = useUiStore((s) => s.roomArchiveOpen);
+  const roomId = useUiStore((s) => s.roomArchiveOpen);
   const close = useUiStore((s) => s.closeRoomArchive);
   const openDoc = useUiStore((s) => s.openDocViewer);
   const { sessions } = useSessionList();
@@ -17,6 +18,13 @@ export function ArchiveDrawer() {
 
   const confirmTarget = confirmId ? sessions.find((s) => s.id === confirmId) : null;
 
+  const roomAgents = roomId ? ROOMS.find((r) => r.id === roomId)?.agents ?? [] : [];
+  const roomName = roomId ? ROOMS.find((r) => r.id === roomId)?.name ?? '' : '';
+
+  const filteredSessions = sessions.filter((session) =>
+    session.phases.some((p) => p.agents.some((a) => roomAgents.includes(a)))
+  );
+
   const handleDelete = async () => {
     if (!confirmId) return;
     setDeleting(true);
@@ -24,7 +32,7 @@ export function ArchiveDrawer() {
       await deleteSession(confirmId);
       setConfirmId(null);
     } catch {
-      // Error shown via UI state, keep dialog open
+      // Error shown via UI state
     } finally {
       setDeleting(false);
     }
@@ -35,7 +43,7 @@ export function ArchiveDrawer() {
 
   const uniqueOutputs = (outputs: string[]) => [...new Set(outputs)];
 
-  if (!open) return null;
+  if (!roomId) return null;
 
   return (
     <>
@@ -44,15 +52,15 @@ export function ArchiveDrawer() {
         <div className="relative w-96 bg-gray-800 border-l border-gray-700 h-full overflow-y-auto">
           <div className="p-4">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-white text-lg font-semibold">档案柜</h3>
+              <h3 className="text-white text-lg font-semibold">档案柜 — {roomName}</h3>
               <button className="text-gray-400 hover:text-white" onClick={close}>✕</button>
             </div>
 
-            {sessions.length === 0 ? (
-              <p className="text-gray-500 text-sm">暂无历史记录</p>
+            {filteredSessions.length === 0 ? (
+              <p className="text-gray-500 text-sm">暂无文档</p>
             ) : (
               <div className="space-y-3">
-                {sessions.map((session) => (
+                {filteredSessions.map((session) => (
                   <div
                     key={session.id}
                     className="bg-gray-900 rounded-lg p-3 border border-gray-700 cursor-pointer hover:border-gray-500"

@@ -1,10 +1,7 @@
 import { useSessionStore } from '../../stores/sessionStore';
-import { useUiStore } from '../../stores/uiStore';
 
 export function StatusBar() {
   const session = useSessionStore((s) => s.activeSession);
-  const openNewTask = useUiStore((s) => s.openNewTaskModal);
-  const openArchive = useUiStore((s) => s.openRoomArchive);
 
   const phaseLabels = session?.phases.map((p) => `${p.name}: ${p.status}`).join(' → ') ?? '';
 
@@ -22,20 +19,6 @@ export function StatusBar() {
           )}
         </span>
         {phaseLabels && <span className="text-gray-500 text-xs">{phaseLabels}</span>}
-      </div>
-      <div className="flex gap-2">
-        <button
-          className="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded-md"
-          onClick={() => openNewTask('rd')}
-        >
-          + 新任务
-        </button>
-        <button
-          className="bg-gray-700 hover:bg-gray-600 text-white text-xs px-3 py-1.5 rounded-md"
-          onClick={() => openArchive('rd')}
-        >
-          档案柜
-        </button>
       </div>
     </div>
   );
