@@ -24,6 +24,7 @@ class PhaseStatus(StrEnum):
     RUNNING = "running"
     COMPLETED = "completed"
     FAILED = "failed"
+    SKIPPED = "skipped"
 
 
 class SessionConfig(BaseModel):
@@ -90,6 +91,7 @@ class AgentDefinition(BaseModel):
     system_prompt: str
     output_file: str | None = None
     output_template: str | None = None
+    casual_prompt: str | None = None
 
 
 class AgentResult(BaseModel):

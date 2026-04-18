@@ -85,3 +85,28 @@ def test_agent_result_failure():
     )
     assert result.success is False
     assert result.output_files == []
+
+
+def test_phase_status_skipped():
+    assert PhaseStatus.SKIPPED == "skipped"
+
+
+def test_agent_definition_casual_prompt_default():
+    data = {
+        "name": "需求分析师",
+        "id": "analyst",
+        "system_prompt": "You are an analyst.",
+    }
+    agent = AgentDefinition(**data)
+    assert agent.casual_prompt is None
+
+
+def test_agent_definition_with_casual_prompt():
+    data = {
+        "name": "需求分析师",
+        "id": "analyst",
+        "system_prompt": "You are an analyst.",
+        "casual_prompt": "轻松回应即可。",
+    }
+    agent = AgentDefinition(**data)
+    assert agent.casual_prompt == "轻松回应即可。"
