@@ -62,12 +62,14 @@ class WorkflowEngine:
 
     def create_session(self, req: CreateSessionRequest) -> Session:
         """Create a new session (sync, returns immediately)."""
+        room_agents = [a.id for a in self.vault_manager.load_agents_by_room(req.room)]
+        if not room_agents:
+            raise ValueError(f"No agents found for room '{req.room}'")
         session_id = self._generate_session_id()
-        session = Session.from_request(req, session_id)
+        session = Session.from_request(req, session_id, room_agents=room_agents)
         session.status = SessionStatus.RUNNING
         session.updated_at = datetime.now()
         self._sessions[session_id] = session
-
         self.vault_manager.create_session(session)
         self.vault_manager.update_session(session)
         return session

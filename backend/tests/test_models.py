@@ -51,6 +51,16 @@ def test_session_from_request():
     assert session.status == SessionStatus.CREATED
     assert session.input_requirement == "test requirement"
     assert len(session.phases) == 4  # default mode has 4 phases
+    assert session.room == "rd"
+
+
+def test_session_from_request_with_room_agents():
+    req = CreateSessionRequest(requirement="test requirement", room="meeting")
+    session = Session.from_request(req, "test-id", room_agents=["analyst", "architect"])
+    assert len(session.phases) == 2
+    assert session.phases[0].agents == ["analyst"]
+    assert session.phases[1].agents == ["architect"]
+    assert session.room == "meeting"
 
 
 def test_agent_definition_from_yaml():
@@ -154,13 +164,20 @@ def test_rounds_default_is_one():
 
 
 def test_create_session_request_requires_room():
-    """CreateSessionRequest must include room field."""
+    """CreateSessionRequest must include room field with min_length=1."""
     import pydantic
 
     # Missing room should raise
     try:
         CreateSessionRequest(requirement="test", mode="default")
         assert False, "Should have raised validation error"
+    except pydantic.ValidationError:
+        pass
+
+    # Empty room should raise
+    try:
+        CreateSessionRequest(requirement="test", mode="default", room="")
+        assert False, "Should have raised validation error for empty room"
     except pydantic.ValidationError:
         pass
 

@@ -20,7 +20,7 @@ def _create_agent_yamls(agents_dir: Path) -> None:
         {"id": "architect", "name": "架构师", "system_prompt": "You are an architect.", "room": "rd"},
         {"id": "dev-lead", "name": "开发负责人", "system_prompt": "You are a dev lead.", "room": "rd"},
         {"id": "test-lead", "name": "测试负责人", "system_prompt": "You are a test lead.", "room": "rd"},
-        {"id": "moderator", "name": "讨论主持人", "system_prompt": "You are a moderator.", "room": "rd"},
+        {"id": "moderator", "name": "讨论主持人", "system_prompt": "You are a moderator.", "room": "moderator"},
     ]
     for agent in agents:
         path = agents_dir / f"{agent['id']}.yaml"

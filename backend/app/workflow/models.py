@@ -35,7 +35,7 @@ class CreateSessionRequest(BaseModel):
     requirement: str
     mode: SessionMode = SessionMode.DEFAULT
     agents: list[str] | None = None
-    room: str  # Required
+    room: str = Field(..., min_length=1)
     config: SessionConfig = Field(default_factory=SessionConfig)
 
 
@@ -62,19 +62,19 @@ class Session(BaseModel):
     input_requirement: str = ""
     phases: list[Phase] = Field(default_factory=list)
     config_rounds: int = 1
+    room: str = "rd"
 
     @classmethod
-    def from_request(cls, req: CreateSessionRequest, session_id: str) -> "Session":
+    def from_request(cls, req: CreateSessionRequest, session_id: str, room_agents: list[str] | None = None) -> "Session":
+        agents = room_agents or ["analyst", "architect", "dev-lead", "test-lead"]
         if req.mode == SessionMode.DEFAULT:
             phases = [
-                Phase(id=1, name="需求分析", agents=["analyst"]),
-                Phase(id=2, name="方案设计", agents=["architect"]),
-                Phase(id=3, name="开发任务", agents=["dev-lead"]),
-                Phase(id=4, name="测试计划", agents=["test-lead"]),
+                Phase(id=i + 1, name=f"阶段 {i + 1}", agents=[agent_id])
+                for i, agent_id in enumerate(agents)
             ]
         else:
             phases = [
-                Phase(id=1, name="讨论", agents=["analyst", "architect", "dev-lead", "test-lead"]),
+                Phase(id=1, name="讨论", agents=agents),
             ]
         return cls(
             id=session_id,
@@ -82,6 +82,7 @@ class Session(BaseModel):
             input_requirement=req.requirement,
             phases=phases,
             config_rounds=req.config.rounds,
+            room=req.room,
         )
 
 
