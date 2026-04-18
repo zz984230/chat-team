@@ -1,10 +1,8 @@
 import { useEffect } from 'react';
 import { Graphics } from 'pixi.js';
 import { Text } from '@pixi/text';
-import { Rectangle } from '@pixi/math';
 import { ROOMS, MAP_CONFIG } from '../../data/mapConfig';
 import { useViewport } from './PixiCanvas';
-import { useUiStore } from '../../stores/uiStore';
 import type { FurnitureItem } from '../../data/mapConfig';
 
 const { tileWidth, tileHeight, mapWidth, mapHeight, corridorColor, wallColor, wallThickness } = MAP_CONFIG;
@@ -36,7 +34,6 @@ function drawWhiteboard(g: Graphics, item: FurnitureItem) {
   g.beginFill(item.color);
   g.drawRect(px, py, pw, ph);
   g.endFill();
-  // Glass effect - semi-transparent inner rectangle
   g.beginFill(0xffffff, 0.15);
   g.drawRect(px + 2, py + 2, pw - 4, ph - 4);
   g.endFill();
@@ -50,56 +47,39 @@ function drawScreen(g: Graphics, item: FurnitureItem) {
   g.beginFill(item.color);
   g.drawRect(px, py, pw, ph);
   g.endFill();
-  // Screen glow - light blue tinted inner rectangle
   g.beginFill(0x88bbff, 0.3);
   g.drawRect(px + 2, py + 2, pw - 4, ph - 4);
   g.endFill();
 }
 
-function drawBookshelf(g: Graphics, item: FurnitureItem) {
-  const px = item.x * tileWidth;
-  const py = item.y * tileHeight;
-  const pw = item.width * tileWidth;
-  const ph = item.height * tileHeight;
-  g.beginFill(item.color);
-  g.drawRect(px, py, pw, ph);
-  g.endFill();
-  // Horizontal lines at 16px intervals
-  g.lineStyle(1, 0x000000, 0.3);
-  const startY = py + 16;
-  for (let ly = startY; ly < py + ph; ly += 16) {
-    g.moveTo(px, ly);
-    g.lineTo(px + pw, ly);
-  }
-  g.lineStyle(0);
-}
-
-function drawCabinet(g: Graphics, item: FurnitureItem) {
-  const px = item.x * tileWidth;
-  const py = item.y * tileHeight;
-  const pw = item.width * tileWidth;
-  const ph = item.height * tileHeight;
-  // Filled rectangle with 1px inset
-  g.beginFill(item.color);
-  g.drawRect(px + 1, py + 1, pw - 2, ph - 2);
-  g.endFill();
-  // Small circle handle in center
-  g.beginFill(0x999988);
-  g.drawCircle(px + pw / 2, py + ph / 2, 3);
-  g.endFill();
-}
-
-function drawLamp(g: Graphics, item: FurnitureItem) {
+function drawRoundTable(g: Graphics, item: FurnitureItem) {
   const cx = (item.x + item.width / 2) * tileWidth;
   const cy = (item.y + item.height / 2) * tileHeight;
-  // Larger semi-transparent glow circle
-  g.beginFill(item.color, 0.2);
-  g.drawCircle(cx, cy, Math.min(item.width * tileWidth, item.height * tileHeight) * 0.45);
-  g.endFill();
-  // Filled circle
+  const rx = (item.width * tileWidth) / 2 - 4;
+  const ry = (item.height * tileHeight) / 2 - 4;
   g.beginFill(item.color);
-  g.drawCircle(cx, cy, 4);
+  g.drawEllipse(cx, cy, rx, ry);
   g.endFill();
+  g.beginFill(0x7d6d57, 0.3);
+  g.drawEllipse(cx, cy, rx * 0.7, ry * 0.7);
+  g.endFill();
+}
+
+function drawCovered(g: Graphics, item: FurnitureItem) {
+  const px = item.x * tileWidth;
+  const py = item.y * tileHeight;
+  const pw = item.width * tileWidth;
+  const ph = item.height * tileHeight;
+  g.beginFill(item.color);
+  g.drawRoundedRect(px + 1, py + 1, pw - 2, ph - 2, 2);
+  g.endFill();
+  g.lineStyle(1, 0x555555, 0.4);
+  const midY = py + ph / 2;
+  g.moveTo(px + 3, midY - 3);
+  g.lineTo(px + pw - 3, midY - 3);
+  g.moveTo(px + 3, midY + 3);
+  g.lineTo(px + pw - 3, midY + 3);
+  g.lineStyle(0);
 }
 
 function drawFurniture(g: Graphics, item: FurnitureItem) {
@@ -116,21 +96,17 @@ function drawFurniture(g: Graphics, item: FurnitureItem) {
     case 'screen':
       drawScreen(g, item);
       break;
-    case 'bookshelf':
-      drawBookshelf(g, item);
+    case 'round_table':
+      drawRoundTable(g, item);
       break;
-    case 'cabinet':
-      drawCabinet(g, item);
-      break;
-    case 'lamp':
-      drawLamp(g, item);
+    case 'covered':
+      drawCovered(g, item);
       break;
   }
 }
 
 export function OfficeMap() {
   const viewport = useViewport();
-  const openArchiveDrawer = useUiStore((s) => s.openArchiveDrawer);
 
   useEffect(() => {
     if (!viewport) return;
@@ -142,7 +118,28 @@ export function OfficeMap() {
     container.drawRect(0, 0, mapWidth * tileWidth, mapHeight * tileHeight);
     container.endFill();
 
-    // 2. Draw each room
+    // 2. T-shaped corridor
+    container.beginFill(corridorColor);
+    container.drawRect(10 * tileWidth, 9 * tileHeight, 4 * tileWidth, 3 * tileHeight);
+    container.endFill();
+    container.beginFill(corridorColor);
+    container.drawRect(0, 10 * tileHeight, mapWidth * tileWidth, 2 * tileHeight);
+    container.endFill();
+
+    // 3. Company name
+    const companyLabel = new Text(MAP_CONFIG.companyName, {
+      fontFamily: 'sans-serif',
+      fontSize: 18,
+      fill: 0x667788,
+      fontWeight: 'bold',
+      align: 'center',
+    });
+    companyLabel.anchor.set(0.5);
+    companyLabel.x = (mapWidth / 2) * tileWidth;
+    companyLabel.y = 0.5 * tileHeight;
+    container.addChild(companyLabel);
+
+    // 4. Draw each room
     for (const room of ROOMS) {
       const { x, y, width, height } = room.bounds;
       const rx = x * tileWidth;
@@ -150,67 +147,73 @@ export function OfficeMap() {
       const rw = width * tileWidth;
       const rh = height * tileHeight;
 
-      // Floor with room-specific color
       container.beginFill(room.floorColor);
       container.drawRect(rx, ry, rw, rh);
       container.endFill();
 
-      // Walls
-      container.lineStyle(wallThickness, wallColor, 1);
-      container.drawRect(rx, ry, rw, rh);
-      container.lineStyle(0);
+      if (room.status === 'renovating') {
+        container.lineStyle(wallThickness, wallColor, 0.5);
+        container.drawRect(rx, ry, rw, rh);
+        container.lineStyle(0);
 
-      // Furniture
-      for (const item of room.furniture) {
-        drawFurniture(container, item);
+        container.beginFill(0x000000, 0.2);
+        container.drawRect(rx, ry, rw, rh);
+        container.endFill();
+
+        for (const item of room.furniture) {
+          drawFurniture(container, item);
+        }
+
+        const sign = new Text('🔒 装修中', {
+          fontFamily: 'sans-serif',
+          fontSize: 12,
+          fill: 0x888888,
+          align: 'center',
+        });
+        sign.anchor.set(0.5);
+        sign.x = (x + width / 2) * tileWidth;
+        sign.y = (y + height / 2) * tileHeight;
+        container.addChild(sign);
+
+        const label = new Text(room.name, {
+          fontFamily: 'sans-serif',
+          fontSize: 11,
+          fill: 0x666666,
+          align: 'center',
+        });
+        label.anchor.set(0.5);
+        label.x = (x + width / 2) * tileWidth;
+        label.y = (y + height / 2 + 1) * tileHeight;
+        container.addChild(label);
+      } else {
+        container.lineStyle(wallThickness, wallColor, 1);
+        container.drawRect(rx, ry, rw, rh);
+        container.lineStyle(0);
+
+        for (const item of room.furniture) {
+          drawFurniture(container, item);
+        }
+
+        const label = new Text(room.name, {
+          fontFamily: 'sans-serif',
+          fontSize: 14,
+          fill: 0x88aa88,
+          align: 'center',
+        });
+        label.anchor.set(0.5);
+        label.x = (x + width / 2) * tileWidth;
+        label.y = (y + 0.6) * tileHeight;
+        container.addChild(label);
       }
-
-      // Room name label
-      const label = new Text(room.name, {
-        fontFamily: 'sans-serif',
-        fontSize: 14,
-        fill: 0x888899,
-        align: 'center',
-      });
-      label.anchor.set(0.5);
-      label.x = (x + width / 2) * tileWidth;
-      label.y = (y + 0.5) * tileHeight;
-      container.addChild(label);
     }
 
     viewport.addChild(container);
 
-    // 3. Click-interactive layer over archive room
-    const archiveRoom = ROOMS.find((r) => r.id === 'archive');
-    let hitArea: Graphics | null = null;
-    if (archiveRoom) {
-      const { x, y, width, height } = archiveRoom.bounds;
-      hitArea = new Graphics();
-      hitArea.beginFill(0xffffff, 0.01);
-      hitArea.drawRect(x * tileWidth, y * tileHeight, width * tileWidth, height * tileHeight);
-      hitArea.endFill();
-      hitArea.hitArea = new Rectangle(
-        x * tileWidth,
-        y * tileHeight,
-        width * tileWidth,
-        height * tileHeight,
-      );
-      hitArea.cursor = 'pointer';
-      hitArea.eventMode = 'static';
-      hitArea.on('pointerdown', openArchiveDrawer);
-      viewport.addChild(hitArea);
-    }
-
     return () => {
-      if (hitArea) {
-        hitArea.off('pointerdown', openArchiveDrawer);
-        viewport.removeChild(hitArea);
-        hitArea.destroy();
-      }
       viewport.removeChild(container);
       container.destroy({ children: true });
     };
-  }, [viewport, openArchiveDrawer]);
+  }, [viewport]);
 
   return null;
 }
