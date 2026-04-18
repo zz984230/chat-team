@@ -67,13 +67,14 @@ class Session(BaseModel):
             phases = [
                 Phase(id=1, name="需求分析", agents=["analyst"]),
                 Phase(id=2, name="方案设计", agents=["architect"]),
-                Phase(id=3, name="整合输出", agents=["writer"]),
+                Phase(id=3, name="开发任务", agents=["dev-lead"]),
+                Phase(id=4, name="测试计划", agents=["test-lead"]),
             ]
         else:
             agents = req.agents or ["analyst", "architect"]
             phases = [
                 Phase(id=1, name="头脑风暴", agents=agents),
-                Phase(id=2, name="整合输出", agents=["writer"]),
+                Phase(id=2, name="整合输出", agents=["test-lead"]),
             ]
         return cls(
             id=session_id,
