@@ -37,6 +37,13 @@ class WorkflowEngine:
         self._sessions: dict[str, Session] = {}
         self._load_agent_defs()
 
+    @staticmethod
+    def _add_outputs(phase: Any, new_files: list[str]) -> list[str]:
+        """Extend phase.outputs with deduplication. Returns only the actually new files."""
+        added = [f for f in new_files if f not in phase.outputs]
+        phase.outputs.extend(added)
+        return added
+
     def _load_agent_defs(self) -> None:
         """Load agent definitions from vault."""
         for agent in self.vault_manager.load_agent_definitions():
@@ -151,13 +158,13 @@ class WorkflowEngine:
 
         result = await self.pool.submit(runner, task)
 
-        phase.outputs.extend(result.output_files)
+        added = self._add_outputs(phase, result.output_files)
         phase.status = PhaseStatus.COMPLETED if result.success else PhaseStatus.FAILED
         phase.completed_at = datetime.now()
         self.vault_manager.update_session(session)
 
         await self.ws_manager.emit(
-            session.id, "phase:completed", phase=phase.id, outputs=result.output_files,
+            session.id, "phase:completed", phase=phase.id, outputs=added,
         )
 
     async def _run_parallel_phase(
@@ -190,10 +197,11 @@ class WorkflowEngine:
             return_exceptions=True,
         )
 
+        added: list[str] = []
         success_count = 0
         for r in results:
             if isinstance(r, AgentResult):
-                phase.outputs.extend(r.output_files)
+                added.extend(self._add_outputs(phase, r.output_files))
                 if r.success:
                     success_count += 1
 
@@ -206,7 +214,7 @@ class WorkflowEngine:
         self.vault_manager.update_session(session)
 
         await self.ws_manager.emit(
-            session.id, "phase:completed", phase=phase.id, outputs=phase.outputs,
+            session.id, "phase:completed", phase=phase.id, outputs=added,
         )
 
     def get_session(self, session_id: str) -> Session | None:
