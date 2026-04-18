@@ -68,3 +68,21 @@ def test_stream_event_model():
     assert event.type == "thinking"
     assert event.tool_name is None
     assert event.cost_usd is None
+
+
+def test_parse_tool_use_captures_input():
+    """Parse tool use event captures the input payload."""
+    line = '{"type":"assistant","subtype":"tool_use","name":"nominate_speaker","input":{"agent_id":"architect"}}'
+    event = parse_stream_line(line)
+    assert event is not None
+    assert event.type == "working"
+    assert event.tool_name == "nominate_speaker"
+    assert event.tool_input == {"agent_id": "architect"}
+
+
+def test_parse_tool_use_without_input():
+    """Tool use event without input defaults to empty dict."""
+    line = '{"type":"assistant","subtype":"tool_use","name":"nominate_speaker"}'
+    event = parse_stream_line(line)
+    assert event is not None
+    assert event.tool_input == {}

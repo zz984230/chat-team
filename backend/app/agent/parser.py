@@ -9,6 +9,7 @@ class StreamEvent(BaseModel):
     type: str  # thinking, working, output, completed, failed
     content: str | None = None
     tool_name: str | None = None
+    tool_input: dict[str, Any] = {}
     error: str | None = None
     cost_usd: float | None = None
 
@@ -34,7 +35,7 @@ def parse_stream_line(line: str) -> StreamEvent | None:
         if subtype == "text":
             return StreamEvent(type="thinking", content=data.get("content", ""))
         elif subtype == "tool_use":
-            return StreamEvent(type="working", tool_name=data.get("name"))
+            return StreamEvent(type="working", tool_name=data.get("name"), tool_input=data.get("input", {}))
 
     elif event_type == "tool_result":
         return StreamEvent(type="output")
