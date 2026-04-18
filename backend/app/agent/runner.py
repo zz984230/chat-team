@@ -22,6 +22,7 @@ class AgentRunConfig(BaseModel):
     api_key: str = ""
     api_base_url: str = ""
     allowed_tools: list[str] = []
+    use_casual: bool = False
 
 
 class AgentRunner:
@@ -43,11 +44,14 @@ class AgentRunner:
 
     def build_prompt(self, task: str) -> str:
         """Build the full prompt for claude -p."""
-        parts = [self.agent_def.system_prompt]
-        if self.agent_def.output_template:
-            parts.append(
-                f"\n\n输出格式参考:\n{self.agent_def.output_template}"
-            )
+        if self.config.use_casual and self.agent_def.casual_prompt:
+            parts = [self.agent_def.casual_prompt]
+        else:
+            parts = [self.agent_def.system_prompt]
+            if self.agent_def.output_template:
+                parts.append(
+                    f"\n\n输出格式参考:\n{self.agent_def.output_template}"
+                )
         parts.append(f"\n\n## 任务\n{task}")
         return "".join(parts)
 
