@@ -1,4 +1,5 @@
 import asyncio
+import subprocess
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -48,6 +49,69 @@ class WorkflowEngine:
         """Load agent definitions from vault."""
         for agent in self.vault_manager.load_agent_definitions():
             self._agent_defs[agent.id] = agent
+
+    async def _classify_input(self, requirement: str) -> bool:
+        """Classify input as complex (True) or simple (False).
+
+        Uses claude CLI with haiku model for fast, cheap classification.
+        Defaults to True (complex) on any failure.
+        """
+        import json
+        import os
+        import sys
+
+        claude_cmd = "claude.cmd" if sys.platform == "win32" else "claude"
+        classify_prompt = (
+            "判断以下输入是否需要深入分析和多轮讨论。"
+            "如果只是打招呼、简单提问、闲聊，回复 SIMPLE。"
+            "如果是复杂需求、技术方案、需要分析的议题，回复 COMPLEX。"
+            f"\n\n输入：{requirement}"
+        )
+        cmd = [
+            claude_cmd, "-p", "-",
+            "--output-format", "stream-json",
+            "--model", "claude-haiku-4-5-20251001",
+            "--max-turns", "1",
+        ]
+        env = dict(os.environ)
+        if self.api_key:
+            env["ANTHROPIC_API_KEY"] = self.api_key
+        if self.api_base_url:
+            env["ANTHROPIC_BASE_URL"] = self.api_base_url
+
+        loop = asyncio.get_event_loop()
+
+        def _run():
+            proc = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                stdin=subprocess.PIPE,
+                env=env,
+            )
+            stdout, stderr = proc.communicate(
+                input=classify_prompt.encode("utf-8"), timeout=10,
+            )
+            return stdout.decode("utf-8", errors="replace")
+
+        try:
+            stdout = await loop.run_in_executor(None, _run)
+            for line in stdout.strip().splitlines():
+                try:
+                    data = json.loads(line.strip())
+                    if data.get("type") == "result" and data.get("subtype") == "success":
+                        result_text = (data.get("result") or "").strip().upper()
+                        if "SIMPLE" in result_text:
+                            return False
+                        if "COMPLEX" in result_text:
+                            return True
+                except (json.JSONDecodeError, KeyError):
+                    continue
+            return True  # default to complex if no clear answer
+        except Exception:
+            import logging
+            logging.getLogger(__name__).warning("Input classification failed, defaulting to complex")
+            return True
 
     def _get_agent_def(self, agent_id: str) -> AgentDefinition:
         """Get agent definition by ID. Raises KeyError if not found."""

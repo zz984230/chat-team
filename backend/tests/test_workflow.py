@@ -1,4 +1,5 @@
 import asyncio
+import subprocess
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -134,3 +135,36 @@ async def test_list_sessions(engine: WorkflowEngine):
 
     sessions = engine.list_sessions()
     assert len(sessions) == 2
+
+
+@pytest.mark.asyncio
+async def test_classify_input_returns_true_for_complex(engine: WorkflowEngine):
+    """Complex input is classified as needing full workflow."""
+    with patch("app.workflow.engine.subprocess.Popen") as mock_popen:
+        proc = MagicMock()
+        proc.communicate.return_value = (b'{"type":"result","subtype":"success","result":"COMPLEX"}', b"")
+        proc.returncode = 0
+        mock_popen.return_value = proc
+        result = await engine._classify_input("设计一个电商系统，需要支持多商户和支付功能")
+        assert result is True
+
+
+@pytest.mark.asyncio
+async def test_classify_input_returns_false_for_simple(engine: WorkflowEngine):
+    """Simple input is classified as not needing full workflow."""
+    with patch("app.workflow.engine.subprocess.Popen") as mock_popen:
+        proc = MagicMock()
+        proc.communicate.return_value = (b'{"type":"result","subtype":"success","result":"SIMPLE"}', b"")
+        proc.returncode = 0
+        mock_popen.return_value = proc
+        result = await engine._classify_input("你好")
+        assert result is False
+
+
+@pytest.mark.asyncio
+async def test_classify_input_defaults_to_complex_on_error(engine: WorkflowEngine):
+    """Classification failure defaults to complex (full workflow)."""
+    with patch("app.workflow.engine.subprocess.Popen") as mock_popen:
+        mock_popen.side_effect = Exception("claude CLI not found")
+        result = await engine._classify_input("你好")
+        assert result is True
