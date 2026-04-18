@@ -44,6 +44,48 @@ export function parseDiscussion(markdown: string): ParsedDiscussion {
   return { requirement, agents };
 }
 
+const AGENT_COLORS: Record<string, { bg: string; border: string; text: string }> = {
+  analyst: { bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-800' },
+  architect: { bg: 'bg-purple-50', border: 'border-purple-200', text: 'text-purple-800' },
+  'dev-lead': { bg: 'bg-green-50', border: 'border-green-200', text: 'text-green-800' },
+  'test-lead': { bg: 'bg-orange-50', border: 'border-orange-200', text: 'text-orange-800' },
+};
+
+const DEFAULT_COLORS = { bg: 'bg-gray-50', border: 'border-gray-200', text: 'text-gray-800' };
+
+export function DiscussionCards({ data }: { data: ParsedDiscussion }) {
+  return (
+    <div className="space-y-4">
+      <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+        <h3 className="text-sm font-semibold text-gray-500 mb-1">原始需求</h3>
+        <p className="text-gray-900">{data.requirement}</p>
+      </div>
+
+      {data.agents.map((agent) => {
+        const colors = AGENT_COLORS[agent.id] ?? DEFAULT_COLORS;
+        return (
+          <div key={agent.id} className={`rounded-lg border ${colors.border} ${colors.bg} overflow-hidden`}>
+            <div className={`px-4 py-2 font-semibold ${colors.text} border-b ${colors.border}`}>
+              {agent.id}
+              <span className="ml-2 text-xs opacity-60">{agent.turns.length} 轮发言</span>
+            </div>
+            <div className="p-4 space-y-4">
+              {agent.turns.map((turn) => (
+                <div key={turn.round}>
+                  <span className={`text-xs font-medium ${colors.text} opacity-70`}>第{turn.round}轮</span>
+                  <div className="mt-1 prose prose-sm max-w-none">
+                    <ReactMarkdown>{turn.content}</ReactMarkdown>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export function DocViewer() {
   const target = useUiStore((s) => s.docViewer);
   const close = useUiStore((s) => s.closeDocViewer);
