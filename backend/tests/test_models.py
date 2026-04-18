@@ -48,7 +48,7 @@ def test_session_from_request():
     assert session.id == "20260413-153000-abc"
     assert session.status == SessionStatus.CREATED
     assert session.input_requirement == "test requirement"
-    assert len(session.phases) == 3  # default mode has 3 phases
+    assert len(session.phases) == 4  # default mode has 4 phases
 
 
 def test_agent_definition_from_yaml():

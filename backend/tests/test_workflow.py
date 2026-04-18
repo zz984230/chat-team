@@ -20,7 +20,8 @@ def _create_agent_yamls(agents_dir: Path) -> None:
     agents = [
         {"id": "analyst", "name": "需求分析师", "system_prompt": "You are an analyst."},
         {"id": "architect", "name": "架构师", "system_prompt": "You are an architect."},
-        {"id": "writer", "name": "整合输出师", "system_prompt": "You are a writer."},
+        {"id": "dev-lead", "name": "开发负责人", "system_prompt": "You are a dev lead."},
+        {"id": "test-lead", "name": "测试负责人", "system_prompt": "You are a test lead."},
     ]
     for agent in agents:
         path = agents_dir / f"{agent['id']}.yaml"
@@ -67,8 +68,8 @@ async def test_run_default_workflow_phases(engine: WorkflowEngine):
     session = engine.create_session(req)
     await engine.execute_session(session)
 
-    # Should have called pool.submit once per agent (3 total: analyst + architect + writer)
-    assert engine.pool.submit.call_count == 3
+    # Should have called pool.submit once per agent (4 total: analyst + architect + dev-lead + test-lead)
+    assert engine.pool.submit.call_count == 4
 
 
 @pytest.mark.asyncio
@@ -92,10 +93,10 @@ async def test_phase_2_runs_parallel(engine: WorkflowEngine):
     await engine.execute_session(session)
 
     # Phase 2 agents should overlap (not strictly sequential)
-    # Both should appear before writer
+    # Both should appear before test-lead
     assert "architect" in call_order
-    assert "writer" in call_order
-    assert call_order.index("writer") > call_order.index("architect")
+    assert "test-lead" in call_order
+    assert call_order.index("test-lead") > call_order.index("architect")
 
 
 @pytest.mark.asyncio
