@@ -178,24 +178,79 @@ class WorkflowEngine:
         await self._run_phase(session, phase, task, session_dir)
 
     async def _run_brainstorm_workflow(self, session: Session) -> None:
-        """Run brainstorm mode with multiple rounds."""
+        """Run brainstorm mode with input classification."""
         session_dir = self.vault_manager._sessions_path / session.id
-        rounds = 3  # default
 
-        # Multi-round brainstorm
-        phase = session.phases[0]
-        for round_num in range(1, rounds + 1):
-            await self._run_parallel_phase(
-                session, phase, session_dir,
-                task_prefix=f"第 {round_num}/{rounds} 轮讨论。请基于已有信息提出你的观点。",
+        is_complex = await self._classify_input(session.input_requirement)
+
+        if not is_complex:
+            # Simple input: single-round casual response from all agents
+            phase = session.phases[0]
+            await self._run_casual_brainstorm(session, phase, session_dir)
+
+            # Skip phase 2 (writer synthesis)
+            if len(session.phases) > 1:
+                session.phases[1].status = PhaseStatus.SKIPPED
+                self.vault_manager.update_session(session)
+        else:
+            # Complex input: full multi-round brainstorm
+            rounds = 3
+            phase = session.phases[0]
+            for round_num in range(1, rounds + 1):
+                await self._run_parallel_phase(
+                    session, phase, session_dir,
+                    task_prefix=f"第 {round_num}/{rounds} 轮讨论。请基于已有信息提出你的观点。",
+                )
+
+            # Final synthesis
+            phase = session.phases[1]
+            await self._run_phase(
+                session, phase,
+                "请阅读所有讨论内容，汇总输出综合报告。",
+                session_dir,
             )
 
-        # Final synthesis
-        phase = session.phases[1]
-        await self._run_phase(
-            session, phase,
-            "请阅读所有讨论内容，汇总输出综合报告。",
-            session_dir,
+    async def _run_casual_brainstorm(self, session: Session, phase: Any, session_dir: Path) -> None:
+        """Run casual single-round brainstorm for simple inputs."""
+        phase.status = PhaseStatus.RUNNING
+        phase.started_at = datetime.now()
+        self.vault_manager.update_session(session)
+        await self.ws_manager.emit(session.id, "phase:started", phase=phase.id)
+
+        task = f"请以你的角色身份直接回应以下内容：\n\n{session.input_requirement}"
+
+        async def run_single(agent_id: str) -> AgentResult:
+            agent_def = self._get_agent_def(agent_id)
+            config = AgentRunConfig(
+                work_dir=Path(f"{self.work_dir}/{session.id}/{agent_id}"),
+                session_dir=session_dir,
+                input_files=[],
+                api_key=self.api_key,
+                api_base_url=self.api_base_url,
+                allowed_tools=self.allowed_tools,
+                use_casual=True,
+            )
+            runner = AgentRunner(agent_def, config)
+            return await self.pool.submit(runner, task)
+
+        results = await asyncio.gather(
+            *[run_single(aid) for aid in phase.agents],
+            return_exceptions=True,
+        )
+
+        added: list[str] = []
+        success_count = 0
+        for r in results:
+            if isinstance(r, AgentResult):
+                added.extend(self._add_outputs(phase, r.output_files))
+                if r.success:
+                    success_count += 1
+
+        phase.status = PhaseStatus.COMPLETED if success_count > 0 else PhaseStatus.FAILED
+        phase.completed_at = datetime.now()
+        self.vault_manager.update_session(session)
+        await self.ws_manager.emit(
+            session.id, "phase:completed", phase=phase.id, outputs=added,
         )
 
     async def _run_phase(

@@ -6,7 +6,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from app.workflow.engine import WorkflowEngine
 from app.workflow.models import (
-    Session, SessionStatus, PhaseStatus, CreateSessionRequest, AgentResult,
+    Session, SessionStatus, PhaseStatus, SessionMode,
+    CreateSessionRequest, AgentResult,
 )
 from app.vault.manager import VaultManager
 from app.ws.manager import WebSocketManager
@@ -168,3 +169,52 @@ async def test_classify_input_defaults_to_complex_on_error(engine: WorkflowEngin
         mock_popen.side_effect = Exception("claude CLI not found")
         result = await engine._classify_input("你好")
         assert result is True
+
+
+@pytest.mark.asyncio
+async def test_brainstorm_simple_input_runs_casual_flow(engine: WorkflowEngine):
+    """Simple input triggers casual flow: all agents in one round, phase 2 skipped."""
+    req = CreateSessionRequest(requirement="你好", mode=SessionMode.BRAINSTORM)
+
+    configs_seen = []
+
+    async def capture_submit(runner, task, event_callback=None):
+        configs_seen.append(runner.config.use_casual)
+        return AgentResult(
+            agent_id=runner.agent_def.id, success=True,
+            output_files=["out.md"], duration_ms=100,
+        )
+
+    engine.pool.submit = capture_submit
+
+    session = engine.create_session(req)
+
+    with patch.object(engine, "_classify_input", return_value=False):
+        await engine.execute_session(session)
+
+    assert session.status == SessionStatus.COMPLETED
+    assert session.phases[0].status == PhaseStatus.COMPLETED
+    assert session.phases[1].status == PhaseStatus.SKIPPED
+    # All agents in phase 1 were run
+    assert len(configs_seen) == len(session.phases[0].agents)
+    # All runners had use_casual=True
+    assert all(c is True for c in configs_seen)
+
+
+@pytest.mark.asyncio
+async def test_brainstorm_complex_input_runs_full_flow(engine: WorkflowEngine):
+    """Complex input triggers full multi-round brainstorm flow."""
+    req = CreateSessionRequest(requirement="设计电商系统", mode=SessionMode.BRAINSTORM)
+
+    engine.pool.submit = AsyncMock(return_value=AgentResult(
+        agent_id="agent", success=True, output_files=["out.md"], duration_ms=100,
+    ))
+
+    session = engine.create_session(req)
+
+    with patch.object(engine, "_classify_input", return_value=True):
+        await engine.execute_session(session)
+
+    assert session.status == SessionStatus.COMPLETED
+    assert session.phases[0].status == PhaseStatus.COMPLETED
+    assert session.phases[1].status == PhaseStatus.COMPLETED
