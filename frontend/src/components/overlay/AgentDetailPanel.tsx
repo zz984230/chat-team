@@ -4,13 +4,15 @@ import { useAgentStore } from '../../stores/agentStore';
 const AGENT_NAMES: Record<string, string> = {
   analyst: '需求分析师',
   architect: '方案架构师',
-  writer: '方案撰写员',
+  'dev-lead': '开发负责人',
+  'test-lead': '测试负责人',
 };
 
 const AGENT_COLORS: Record<string, string> = {
   analyst: 'text-green-400',
   architect: 'text-blue-400',
-  writer: 'text-purple-400',
+  'dev-lead': 'text-orange-400',
+  'test-lead': 'text-purple-400',
 };
 
 export function AgentDetailPanel() {
