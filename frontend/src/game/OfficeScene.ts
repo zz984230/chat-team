@@ -47,8 +47,11 @@ export class OfficeScene extends Phaser.Scene {
     // Full generative_agents map (same JSON they use)
     this.load.tilemapTiledJSON('the_ville', 'assets/maps/the_ville.json');
 
-    // Character atlas (misa)
-    this.load.atlas('atlas', 'assets/sprites/atlas.png', 'assets/sprites/atlas.json');
+    // Character sprites — one atlas per agent for distinct appearances
+    this.load.atlas('analyst', 'assets/sprites/analyst.png', 'assets/sprites/analyst.json');
+    this.load.atlas('architect', 'assets/sprites/architect.png', 'assets/sprites/architect.json');
+    this.load.atlas('dev-lead', 'assets/sprites/dev-lead.png', 'assets/sprites/dev-lead.json');
+    this.load.atlas('test-lead', 'assets/sprites/test-lead.png', 'assets/sprites/test-lead.json');
   }
 
   create() {

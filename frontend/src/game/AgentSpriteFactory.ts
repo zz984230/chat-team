@@ -2,7 +2,13 @@ import type Phaser from 'phaser';
 import { TILE_SIZE, AGENT_SEATS, type AgentVisual } from './types';
 import type { AgentDirection, AgentAnimationState } from '../types';
 
-const ATLAS_KEY = 'atlas';
+// Each agent has its own atlas with the same frame layout but different appearance
+const AGENT_ATLAS: Record<string, string> = {
+  analyst: 'analyst',
+  architect: 'architect',
+  'dev-lead': 'dev-lead',
+  'test-lead': 'test-lead',
+};
 
 const DIR_ANIM: Record<AgentDirection, string> = {
   down: 'misa-front-walk',
@@ -22,34 +28,31 @@ export function defineAnimations(scene: Phaser.Scene) {
   const anims = scene.anims;
   const directions: AgentDirection[] = ['down', 'up', 'left', 'right'];
 
-  for (const dir of directions) {
-    const key = DIR_ANIM[dir];
-    anims.create({
-      key: `${dir}-walk`,
-      frames: anims.generateFrameNames(ATLAS_KEY, {
-        prefix: `${key}.`,
-        start: 0,
-        end: 3,
-        zeroPad: 3,
-      }),
-      frameRate: 4,
-      repeat: -1,
-    });
+  // Create animations for each agent's atlas
+  for (const agentId of Object.keys(AGENT_ATLAS)) {
+    const atlas = AGENT_ATLAS[agentId];
+    for (const dir of directions) {
+      const framePrefix = DIR_ANIM[dir];
+      anims.create({
+        key: `${agentId}-${dir}-walk`,
+        frames: anims.generateFrameNames(atlas, {
+          prefix: `${framePrefix}.`,
+          start: 0,
+          end: 3,
+          zeroPad: 3,
+        }),
+        frameRate: 4,
+        repeat: -1,
+      });
+    }
   }
 }
 
-export function createAgentVisual(
-  scene: Phaser.Scene,
-  agentId: string,
-  onClick: (id: string) => void,
-): AgentVisual {
-  const seat = AGENT_SEATS[agentId]!;
-  const px = seat.x * TILE_SIZE + TILE_SIZE / 2;
-  const py = seat.y * TILE_SIZE + TILE_SIZE / 2;
-
-  const sprite = scene.add.sprite(px, py, ATLAS_KEY, 'misa-front');
+  const sprite = scene.add.sprite(px, py, atlas, 'misa-front');
   sprite.setScale(0.8);
-  sprite.setTint(seat.tint);
+
+  // Store agentId on the visual for animation key lookup
+  const visual: AgentVisual = {
   sprite.setInteractive({ useHandCursor: true });
   sprite.on('pointerdown', () => onClick(agentId));
   sprite.setDepth(py);
@@ -78,6 +81,7 @@ export function createAgentVisual(
   bubbleContainer.add([bubbleBg, bubbleText]);
 
   return {
+    agentId,
     sprite,
     nameText,
     bubbleContainer,
@@ -91,9 +95,10 @@ export function createAgentVisual(
 export function playAnimation(visual: AgentVisual, state: AgentAnimationState, direction: AgentDirection) {
   visual.animState = state;
   visual.direction = direction;
+  const id = visual.agentId;
 
   if (state === 'walking') {
-    visual.sprite.play(`${direction}-walk`, true);
+    visual.sprite.play(`${id}-${direction}-walk`, true);
   } else {
     visual.sprite.stop();
     visual.sprite.setFrame(DIR_IDLE[direction]);

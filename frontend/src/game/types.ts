@@ -6,6 +6,7 @@ export interface GameCallbacks {
 }
 
 export interface AgentVisual {
+  agentId: string;
   sprite: Phaser.GameObjects.Sprite;
   nameText: Phaser.GameObjects.Text;
   bubbleContainer: Phaser.GameObjects.Container;
