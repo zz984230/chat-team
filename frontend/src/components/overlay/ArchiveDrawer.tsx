@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useUiStore } from '../../stores/uiStore';
 import { useSessionStore } from '../../stores/sessionStore';
 import { useSessionList } from '../../hooks/useSession';
-import { ROOM_INFO } from '../../data/mapConfig';
+import { ROOM_INFO } from '../../game/types';
 import { Modal } from '../ui/Modal';
 
 export function ArchiveDrawer() {

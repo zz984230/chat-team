@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Modal } from '../ui/Modal';
 import { useUiStore } from '../../stores/uiStore';
 import { useSessionStore } from '../../stores/sessionStore';
-import { ROOM_INFO } from '../../data/mapConfig';
+import { ROOM_INFO } from '../../game/types';
 import type { SessionMode } from '../../types';
 
 export function NewTaskModal() {
