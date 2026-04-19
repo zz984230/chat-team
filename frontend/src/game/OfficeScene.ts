@@ -47,17 +47,13 @@ export class OfficeScene extends Phaser.Scene {
     // Full generative_agents map (same JSON they use)
     this.load.tilemapTiledJSON('the_ville', 'assets/maps/the_ville.json');
 
-    // Character sprites — one atlas per agent for distinct appearances
-    this.load.atlas('analyst', 'assets/sprites/analyst.png', 'assets/sprites/analyst.json');
-    this.load.atlas('architect', 'assets/sprites/architect.png', 'assets/sprites/architect.json');
-    this.load.atlas('dev-lead', 'assets/sprites/dev-lead.png', 'assets/sprites/dev-lead.json');
-    this.load.atlas('test-lead', 'assets/sprites/test-lead.png', 'assets/sprites/test-lead.json');
+    // Agent character spritesheet
+    this.load.atlas('agents', 'assets/sprites/atlas.png', 'assets/sprites/atlas.json');
   }
 
   create() {
     const map = this.make.tilemap({ key: 'the_ville' });
 
-    // Register all tilesets — same approach as generative_agents main_script.html
     const cuteB = map.addTilesetImage('CuteRPG_Field_B');
     const cuteC = map.addTilesetImage('CuteRPG_Field_C');
     const cuteH = map.addTilesetImage('CuteRPG_Harbor_C');
@@ -80,7 +76,6 @@ export class OfficeScene extends Phaser.Scene {
     const tilesets = [cuteB!, cuteC!, cuteH!, room!, cuteV!, cuteFB!, cuteDC!, cuteMB!, cuteDB!, cuteFC!,
                       int1!, int2!, int3!, int4!, int5!, blk!, blk2!, blk3!];
 
-    // Create all renderable layers — same as generative_agents
     const layers = [
       { name: 'Bottom Ground', depth: 0 },
       { name: 'Exterior Ground', depth: 0 },
@@ -100,36 +95,31 @@ export class OfficeScene extends Phaser.Scene {
       if (layer) layer.setDepth(depth);
     }
 
-    // Collisions (hidden)
     const collisionLayer = map.getLayer('Collisions');
     if (collisionLayer) {
       const cl = map.createLayer('Collisions', tilesets, 0, 0);
       if (cl) cl.setDepth(-1).setAlpha(0);
     }
 
-    // Agent animations and sprites
     defineAnimations(this);
 
     // Place agents at their seats within the library room (map pixel coords)
     for (const agentId of Object.keys(AGENT_SEATS)) {
-      const seat = AGENT_SEATS[agentId]!;
       const visual = createAgentVisual(this, agentId, (id) => {
         this.callbacks?.onAgentClick(id);
       });
-      // Override sprite position to library room coordinates in the full map
+      const seat = AGENT_SEATS[agentId]!;
       const px = (LIB_X + seat.x) * TILE_SIZE + TILE_SIZE / 2;
       const py = (LIB_Y + seat.y) * TILE_SIZE + TILE_SIZE / 2;
-      visual.sprite.setPosition(px, py);
-      visual.sprite.setDepth(py);
-      visual.nameText.setPosition(px, py + 14);
-      visual.nameText.setDepth(py);
-      visual.bubbleContainer.setPosition(px, py - 28);
+      visual.body.setPosition(px, py);
+      visual.body.setDepth(py);
+      visual.bubbleContainer.setPosition(px, py - 48);
       this.agents.set(agentId, visual);
     }
 
     // Initialize walkers for idle wandering
     for (const [agentId, visual] of this.agents) {
-      this.walkers.set(agentId, new RandomWalker(visual, this));
+      this.walkers.set(agentId, new RandomWalker(visual));
     }
 
     // Camera — full town view with drag & zoom
@@ -141,7 +131,6 @@ export class OfficeScene extends Phaser.Scene {
     const cam = this.cameras.main;
     cam.setBounds(0, 0, mapPixelW, mapPixelH);
 
-    // Fit entire map in viewport
     const fitZoom = Math.min(this.scale.width / mapPixelW, this.scale.height / mapPixelH);
     cam.setZoom(fitZoom);
     cam.centerOn(mapPixelW / 2, mapPixelH / 2);
@@ -149,7 +138,6 @@ export class OfficeScene extends Phaser.Scene {
     const MIN_ZOOM = fitZoom;
     const MAX_ZOOM = 3;
 
-    // Drag to pan
     let dragStartX = 0;
     let dragStartY = 0;
     let camStartX = 0;
@@ -177,22 +165,26 @@ export class OfficeScene extends Phaser.Scene {
       dragging = false;
     });
 
-    // Scroll to zoom (toward pointer)
     this.input.on('wheel', (_pointer: Phaser.Input.Pointer, _gameObjects: any[], _dx: number, dy: number) => {
       const zoomFactor = dy > 0 ? 0.9 : 1.1;
       const newZoom = Phaser.Math.Clamp(cam.zoom * zoomFactor, MIN_ZOOM, MAX_ZOOM);
 
-      const worldBefore = cam.getWorldPoint(_pointer.x, _pointer.y);
+      // Phaser midPoint = scroll + halfViewport (independent of zoom).
+      // World at pointer = midPoint + (pointer - halfViewport) / zoom.
+      // Scroll delta keeps the same world point under the mouse after zoom.
+      const halfW = cam.width / 2;
+      const halfH = cam.height / 2;
+      cam.scrollX += (_pointer.x - halfW) * (1 / cam.zoom - 1 / newZoom);
+      cam.scrollY += (_pointer.y - halfH) * (1 / cam.zoom - 1 / newZoom);
       cam.setZoom(newZoom);
-      const worldAfter = cam.getWorldPoint(_pointer.x, _pointer.y);
-      cam.scrollX += worldBefore.x - worldAfter.x;
-      cam.scrollY += worldBefore.y - worldAfter.y;
     });
 
     this.scale.on('resize', () => {
       const newFitZoom = Math.min(this.scale.width / mapPixelW, this.scale.height / mapPixelH);
-      cam.setZoom(newFitZoom);
-      cam.centerOn(mapPixelW / 2, mapPixelH / 2);
+      if (cam.zoom < newFitZoom) {
+        cam.setZoom(newFitZoom);
+        cam.centerOn(mapPixelW / 2, mapPixelH / 2);
+      }
     });
   }
 

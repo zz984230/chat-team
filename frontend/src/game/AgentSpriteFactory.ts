@@ -1,48 +1,46 @@
-import type Phaser from 'phaser';
 import { TILE_SIZE, AGENT_SEATS, type AgentVisual } from './types';
 import type { AgentDirection, AgentAnimationState } from '../types';
 
-const AGENT_ATLAS: Record<string, string> = {
-  analyst: 'analyst',
-  architect: 'architect',
-  'dev-lead': 'dev-lead',
-  'test-lead': 'test-lead',
+const BUBBLE_OFFSET_Y = -48;
+
+const ANIM_PREFIX: Record<AgentAnimationState, string> = {
+  idle: 'idle',
+  walking: 'walk',
+  working: 'idle',
+  thinking: 'idle',
 };
 
-const DIR_ANIM: Record<AgentDirection, string> = {
-  down: 'misa-front-walk',
-  up: 'misa-back-walk',
-  left: 'misa-left-walk',
-  right: 'misa-right-walk',
-};
-
-const DIR_IDLE: Record<AgentDirection, string> = {
-  down: 'misa-front',
-  up: 'misa-back',
-  left: 'misa-left',
-  right: 'misa-right',
+const DIR_KEY: Record<AgentDirection, string> = {
+  down: 'front',
+  up: 'back',
+  left: 'left',
+  right: 'right',
 };
 
 export function defineAnimations(scene: Phaser.Scene) {
-  const anims = scene.anims;
-  const directions: AgentDirection[] = ['down', 'up', 'left', 'right'];
+  if (scene.anims.exists('idle-front')) return;
 
-  for (const agentId of Object.keys(AGENT_ATLAS)) {
-    const atlas = AGENT_ATLAS[agentId];
-    for (const dir of directions) {
-      const framePrefix = DIR_ANIM[dir];
-      anims.create({
-        key: `${agentId}-${dir}-walk`,
-        frames: anims.generateFrameNames(atlas, {
-          prefix: `${framePrefix}.`,
-          start: 0,
-          end: 3,
-          zeroPad: 3,
-        }),
-        frameRate: 4,
-        repeat: -1,
-      });
-    }
+  const dirs = ['front', 'back', 'left', 'right'] as const;
+
+  for (const dir of dirs) {
+    scene.anims.create({
+      key: `idle-${dir}`,
+      frames: [{ key: 'agents', frame: `misa-${dir}` }],
+      frameRate: 8,
+      repeat: -1,
+    });
+
+    scene.anims.create({
+      key: `walk-${dir}`,
+      frames: scene.anims.generateFrameNames('agents', {
+        prefix: `misa-${dir}-walk.`,
+        start: 0,
+        end: 3,
+        zeroPad: 3,
+      }),
+      frameRate: 8,
+      repeat: -1,
+    });
   }
 }
 
@@ -52,26 +50,17 @@ export function createAgentVisual(
   onClick: (id: string) => void,
 ): AgentVisual {
   const seat = AGENT_SEATS[agentId]!;
-  const atlas = AGENT_ATLAS[agentId];
   const px = seat.x * TILE_SIZE + TILE_SIZE / 2;
   const py = seat.y * TILE_SIZE + TILE_SIZE / 2;
 
-  const sprite = scene.add.sprite(px, py, atlas, 'misa-front');
-  sprite.setScale(0.8);
-  sprite.setInteractive({ useHandCursor: true });
-  sprite.on('pointerdown', () => onClick(agentId));
-  sprite.setDepth(py);
+  const body = scene.add.sprite(px, py, 'agents', 'misa-front');
+  body.setOrigin(0.5, 1);
+  body.setTint(seat.tint);
+  body.setDepth(py);
+  body.setInteractive({ useHandCursor: true });
+  body.on('pointerdown', () => onClick(agentId));
 
-  const nameText = scene.add.text(px, py + 14, agentId, {
-    fontSize: '8px',
-    color: '#ffffff',
-    backgroundColor: '#00000088',
-    padding: { x: 2, y: 1 },
-  });
-  nameText.setOrigin(0.5, 0);
-  nameText.setDepth(py);
-
-  const bubbleContainer = scene.add.container(px, py - 28);
+  const bubbleContainer = scene.add.container(px, py + BUBBLE_OFFSET_Y);
   bubbleContainer.setDepth(py + 1);
   bubbleContainer.setVisible(false);
 
@@ -87,8 +76,7 @@ export function createAgentVisual(
 
   return {
     agentId,
-    sprite,
-    nameText,
+    body,
     bubbleContainer,
     bubbleText,
     bubbleBg,
@@ -100,13 +88,9 @@ export function createAgentVisual(
 export function playAnimation(visual: AgentVisual, state: AgentAnimationState, direction: AgentDirection) {
   visual.animState = state;
   visual.direction = direction;
-  const id = visual.agentId;
-
-  if (state === 'walking') {
-    visual.sprite.play(`${id}-${direction}-walk`, true);
-  } else {
-    visual.sprite.stop();
-    visual.sprite.setFrame(DIR_IDLE[direction]);
+  const animKey = `${ANIM_PREFIX[state]}-${DIR_KEY[direction]}`;
+  if (visual.body.anims?.currentAnim?.key !== animKey) {
+    visual.body.play(animKey);
   }
 }
 
@@ -115,7 +99,7 @@ export function updateBubble(visual: AgentVisual, content: string | null) {
     visual.bubbleContainer.setVisible(false);
     return;
   }
-  visual.bubbleText.setText(content.length > 30 ? content.slice(0, 30) + '…' : content);
+  visual.bubbleText.setText(content.length > 30 ? content.slice(0, 30) + '\u2026' : content);
   const tw = visual.bubbleText.width + 8;
   const th = visual.bubbleText.height + 6;
   visual.bubbleBg.clear();
@@ -125,23 +109,26 @@ export function updateBubble(visual: AgentVisual, content: string | null) {
 }
 
 export function moveAgentTo(visual: AgentVisual, targetX: number, targetY: number, scene: Phaser.Scene) {
-  // targetX/Y are room-local coords; convert to full map pixel coords
   const LIB_X = 118;
   const LIB_Y = 19;
   const px = (LIB_X + targetX) * TILE_SIZE + TILE_SIZE / 2;
   const py = (LIB_Y + targetY) * TILE_SIZE + TILE_SIZE / 2;
 
   scene.tweens.add({
-    targets: visual.sprite,
+    targets: visual.body,
     x: px,
     y: py,
     duration: 600,
     ease: 'Power1',
     onUpdate: () => {
-      visual.sprite.setDepth(visual.sprite.y);
-      visual.nameText.setPosition(visual.sprite.x, visual.sprite.y + 14);
-      visual.nameText.setDepth(visual.sprite.y);
-      visual.bubbleContainer.setPosition(visual.sprite.x, visual.sprite.y - 28);
+      syncPosition(visual);
     },
   });
+}
+
+export function syncPosition(visual: AgentVisual) {
+  const x = visual.body.x;
+  const y = visual.body.y;
+  visual.body.setDepth(y);
+  visual.bubbleContainer.setPosition(x, y + BUBBLE_OFFSET_Y);
 }
