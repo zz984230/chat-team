@@ -20,13 +20,9 @@ export class OfficeScene extends Phaser.Scene {
   preload() {
     this.load.image('CuteRPG_Field_B', 'assets/tilesets/CuteRPG_Field_B.png');
     this.load.image('CuteRPG_Field_C', 'assets/tilesets/CuteRPG_Field_C.png');
-    this.load.image('blocks_1', 'assets/tilesets/blocks_1.png');
     this.load.image('Room_Builder_32x32', 'assets/tilesets/Room_Builder_32x32.png');
     this.load.image('interiors_pt1', 'assets/tilesets/interiors_pt1.png');
     this.load.image('interiors_pt2', 'assets/tilesets/interiors_pt2.png');
-    this.load.image('interiors_pt3', 'assets/tilesets/interiors_pt3.png');
-    this.load.image('interiors_pt4', 'assets/tilesets/interiors_pt4.png');
-    this.load.image('interiors_pt5', 'assets/tilesets/interiors_pt5.png');
 
     this.load.tilemapTiledJSON('library', 'assets/maps/library.json');
     this.load.atlas('atlas', 'assets/sprites/atlas.png', 'assets/sprites/atlas.json');
@@ -35,17 +31,14 @@ export class OfficeScene extends Phaser.Scene {
   create() {
     const map = this.make.tilemap({ key: 'library' });
 
-    const cuteB = map.addTilesetImage('CuteRPG_Field_B', 'CuteRPG_Field_B');
-    const cuteC = map.addTilesetImage('CuteRPG_Field_C', 'CuteRPG_Field_C');
-    const blockTS = map.addTilesetImage('blocks', 'blocks_1');
-    const roomTS = map.addTilesetImage('Room_Builder_32x32', 'Room_Builder_32x32');
-    const int1 = map.addTilesetImage('interiors_pt1', 'interiors_pt1');
-    const int2 = map.addTilesetImage('interiors_pt2', 'interiors_pt2');
-    const int3 = map.addTilesetImage('interiors_pt3', 'interiors_pt3');
-    const int4 = map.addTilesetImage('interiors_pt4', 'interiors_pt4');
-    const int5 = map.addTilesetImage('interiors_pt5', 'interiors_pt5');
-
-    const allTilesets = [cuteB!, cuteC!, blockTS!, roomTS!, int1!, int2!, int3!, int4!, int5!];
+    // addTilesetImage(tilesetName, imageKey) — tilesetName must match library.json
+    const tilesets = [
+      map.addTilesetImage('CuteRPG_Field_B', 'CuteRPG_Field_B'),
+      map.addTilesetImage('CuteRPG_Field_C', 'CuteRPG_Field_C'),
+      map.addTilesetImage('Room_Builder_32x32', 'Room_Builder_32x32'),
+      map.addTilesetImage('interiors_pt1', 'interiors_pt1'),
+      map.addTilesetImage('interiors_pt2', 'interiors_pt2'),
+    ].filter(Boolean) as Phaser.Tilemaps.Tileset[];
 
     const layerOrder = [
       'Bottom Ground', 'Interior Ground', 'Wall',
@@ -63,9 +56,8 @@ export class OfficeScene extends Phaser.Scene {
     };
 
     for (const layerName of layerOrder) {
-      const layerData = map.getLayer(layerName);
-      if (!layerData) continue;
-      const layer = map.createLayer(layerName, allTilesets, 0, 0);
+      if (!map.getLayer(layerName)) continue;
+      const layer = map.createLayer(layerName, tilesets, 0, 0);
       if (layer) {
         layer.setDepth(depthMap[layerName] ?? 0);
       }
