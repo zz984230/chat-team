@@ -1,6 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { Container, Graphics, BaseTexture, Texture } from 'pixi.js';
-import { CompositeTilemap } from '@pixi/tilemap';
+import { Container, Graphics, BaseTexture, Texture, Sprite } from 'pixi.js';
 import { useViewport } from './PixiCanvas';
 import { useUiStore } from '../../stores/uiStore';
 import { useSessionStore } from '../../stores/sessionStore';
@@ -42,7 +41,6 @@ export function TiledMap() {
         const mapData = await loadTiledMap('/assets/maps/the_office.json');
         if (destroyed) return;
 
-        // Load all tileset base textures and wait for them
         const baseTextures = new Map<string, BaseTexture>();
         const loadPromises: Promise<void>[] = [];
 
@@ -64,10 +62,8 @@ export function TiledMap() {
         if (loadPromises.length > 0) {
           await Promise.all(loadPromises);
         }
-
         if (destroyed) return;
 
-        // Render tile layers
         for (const layer of mapData.layers) {
           if (!layer.visible) continue;
 
@@ -100,8 +96,8 @@ export function TiledMap() {
     opacity: number,
     baseTextures: Map<string, BaseTexture>,
   ) {
-    const tilemap = new CompositeTilemap();
-    tilemap.alpha = opacity;
+    const layerContainer = new Container();
+    layerContainer.alpha = opacity;
 
     const textureCache = new Map<number, Texture>();
 
@@ -115,11 +111,6 @@ export function TiledMap() {
       const bt = baseTextures.get(tileset.name);
       if (!bt) continue;
 
-      const col = i % mapData.width;
-      const row = Math.floor(i / mapData.width);
-      const x = col * mapData.tileWidth;
-      const y = row * mapData.tileHeight;
-
       let texture = textureCache.get(gid);
       if (!texture) {
         const rect = resolveTileSourceRect(tileset, gid);
@@ -127,11 +118,16 @@ export function TiledMap() {
         textureCache.set(gid, texture);
       }
 
-      tilemap.tile(texture, x, y);
+      const col = i % mapData.width;
+      const row = Math.floor(i / mapData.width);
+      const sprite = new Sprite(texture);
+      sprite.x = col * mapData.tileWidth;
+      sprite.y = row * mapData.tileHeight;
+      layerContainer.addChild(sprite);
     }
 
     const depth = LAYER_DEPTH[layerName] ?? DEFAULT_DEPTH;
-    root.addChildAt(tilemap, Math.min(depth, root.children.length));
+    root.addChildAt(layerContainer, Math.min(depth, root.children.length));
   }
 
   function renderInteractionZones(root: Container, layer: any) {
