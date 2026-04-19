@@ -56,7 +56,7 @@ export function PhaserGame() {
 
   useEffect(() => {
     const scene = sceneRef.current;
-    if (!scene || !scene.scene.isActive()) return;
+    if (!scene || !scene.scene?.isActive) return;
 
     for (const [agentId, state] of Object.entries(agents)) {
       if (state.animationState) {
