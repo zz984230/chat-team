@@ -15,6 +15,10 @@ const AGENT_COLORS: Record<string, string> = {
   'test-lead': 'text-purple-400',
 };
 
+const AGENT_AVATARS: Record<string, string> = {
+  analyst: '/assets/avatars/analyst.png',
+};
+
 export function AgentDetailPanel() {
   const agentId = useUiStore((s) => s.agentDetailPanel);
   const close = useUiStore((s) => s.closeAgentDetail);
@@ -26,9 +30,18 @@ export function AgentDetailPanel() {
     <div className="fixed top-0 right-0 z-50 h-full w-80 bg-gray-800 border-l border-gray-700 shadow-2xl transform transition-transform duration-300">
       <div className="p-4">
         <div className="flex items-center justify-between mb-4">
-          <h3 className={`text-lg font-semibold ${AGENT_COLORS[agentId] ?? 'text-white'}`}>
-            {AGENT_NAMES[agentId] ?? agentId}
-          </h3>
+          <div className="flex items-center gap-3">
+            {AGENT_AVATARS[agentId] && (
+              <img
+                src={AGENT_AVATARS[agentId]}
+                alt={agentId}
+                className="w-12 h-12 rounded-full object-cover border-2 border-gray-600"
+              />
+            )}
+            <h3 className={`text-lg font-semibold ${AGENT_COLORS[agentId] ?? 'text-white'}`}>
+              {AGENT_NAMES[agentId] ?? agentId}
+            </h3>
+          </div>
           <button className="text-gray-400 hover:text-white" onClick={close}>
             ✕
           </button>
