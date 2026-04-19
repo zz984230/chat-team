@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { BaseTexture, Spritesheet, AnimatedSprite, Container, Text, Graphics } from 'pixi.js';
 import { useViewport } from './PixiCanvas';
 import { AGENT_CONFIGS } from '../../data/agentConfig';
-import { MAP_CONFIG, ROOMS } from '../../data/mapConfig';
+import { MAP_CONFIG, AGENT_SEATS } from '../../data/mapConfig';
 import { useAgentStore } from '../../stores/agentStore';
 import { useUiStore } from '../../stores/uiStore';
 import type { AgentAnimationState, AgentDirection } from '../../types';
@@ -124,8 +124,7 @@ export function AgentSprite({ agentId }: { agentId: string }) {
   if (!config) return null;
 
   // Calculate initial position (in pixels)
-  const room = ROOMS.find((r) => r.agents.includes(agentId));
-  const seat = room?.seats[agentId] ?? config.position;
+  const seat = AGENT_SEATS[agentId] ?? { x: config.position.x, y: config.position.y };
   const initialPixelX = seat.x * MAP_CONFIG.tileWidth;
   const initialPixelY = seat.y * MAP_CONFIG.tileHeight;
 

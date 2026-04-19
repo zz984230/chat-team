@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useUiStore } from '../../stores/uiStore';
 import { useSessionStore } from '../../stores/sessionStore';
 import { useSessionList } from '../../hooks/useSession';
-import { ROOMS } from '../../data/mapConfig';
+import { ROOM_INFO } from '../../data/mapConfig';
 import { Modal } from '../ui/Modal';
 
 export function ArchiveDrawer() {
@@ -18,8 +18,8 @@ export function ArchiveDrawer() {
 
   const confirmTarget = confirmId ? sessions.find((s) => s.id === confirmId) : null;
 
-  const roomAgents = roomId ? ROOMS.find((r) => r.id === roomId)?.agents ?? [] : [];
-  const roomName = roomId ? ROOMS.find((r) => r.id === roomId)?.name ?? '' : '';
+  const roomAgents = roomId ? ROOM_INFO[roomId]?.agents ?? [] : [];
+  const roomName = roomId ? ROOM_INFO[roomId]?.name ?? '' : '';
 
   const filteredSessions = sessions.filter((session) =>
     session.phases.some((p) => p.agents.some((a) => roomAgents.includes(a)))

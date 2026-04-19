@@ -3,7 +3,7 @@ import { Graphics } from 'pixi.js';
 import { useViewport } from './PixiCanvas';
 import { useAgentStore } from '../../stores/agentStore';
 import { AGENT_CONFIGS } from '../../data/agentConfig';
-import { ROOMS, MAP_CONFIG } from '../../data/mapConfig';
+import { MAP_CONFIG, AGENT_SEATS } from '../../data/mapConfig';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -22,9 +22,9 @@ const ARCHIVE_CENTER = {
 
 function getAgentPosition(agentId: string): { x: number; y: number } {
   const config = AGENT_CONFIGS[agentId]!;
-  const room = ROOMS.find((r) => r.agents.includes(agentId));
-  const seat = room?.seats[agentId] ?? config.position;
-  return { x: seat.x * MAP_CONFIG.tileWidth, y: seat.y * MAP_CONFIG.tileHeight };
+  const seat = AGENT_SEATS[agentId];
+  const pos = seat ?? config.position;
+  return { x: pos.x * MAP_CONFIG.tileWidth, y: pos.y * MAP_CONFIG.tileHeight };
 }
 
 function createDocumentGraphic(): Graphics {

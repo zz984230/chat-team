@@ -1,5 +1,5 @@
 import { PixiCanvas } from './components/canvas/PixiCanvas';
-import { OfficeMap } from './components/canvas/OfficeMap';
+import { TiledMap } from './components/canvas/TiledMap';
 import { AllAgentSprites } from './components/canvas/AgentSprite';
 import { FlyingDocument } from './components/canvas/FlyingDocument';
 import { CelebrationEffect } from './components/canvas/CelebrationEffect';
@@ -14,7 +14,7 @@ import { useSessionStore } from './stores/sessionStore';
 function GameScene() {
   return (
     <PixiCanvas>
-      <OfficeMap />
+      <TiledMap />
       <AllAgentSprites />
       <FlyingDocument />
       <CelebrationEffect />

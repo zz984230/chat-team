@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Modal } from '../ui/Modal';
 import { useUiStore } from '../../stores/uiStore';
 import { useSessionStore } from '../../stores/sessionStore';
-import { ROOMS } from '../../data/mapConfig';
+import { ROOM_INFO } from '../../data/mapConfig';
 import type { SessionMode } from '../../types';
 
 export function NewTaskModal() {
@@ -16,7 +16,7 @@ export function NewTaskModal() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const roomName = roomId ? ROOMS.find((r) => r.id === roomId)?.name : '';
+  const roomName = roomId ? ROOM_INFO[roomId]?.name : '';
 
   const handleSubmit = async () => {
     if (!requirement.trim() || !roomId) return;
