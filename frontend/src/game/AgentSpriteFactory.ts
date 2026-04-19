@@ -2,7 +2,6 @@ import type Phaser from 'phaser';
 import { TILE_SIZE, AGENT_SEATS, type AgentVisual } from './types';
 import type { AgentDirection, AgentAnimationState } from '../types';
 
-// Each agent has its own atlas with the same frame layout but different appearance
 const AGENT_ATLAS: Record<string, string> = {
   analyst: 'analyst',
   architect: 'architect',
@@ -28,7 +27,6 @@ export function defineAnimations(scene: Phaser.Scene) {
   const anims = scene.anims;
   const directions: AgentDirection[] = ['down', 'up', 'left', 'right'];
 
-  // Create animations for each agent's atlas
   for (const agentId of Object.keys(AGENT_ATLAS)) {
     const atlas = AGENT_ATLAS[agentId];
     for (const dir of directions) {
@@ -47,6 +45,16 @@ export function defineAnimations(scene: Phaser.Scene) {
     }
   }
 }
+
+export function createAgentVisual(
+  scene: Phaser.Scene,
+  agentId: string,
+  onClick: (id: string) => void,
+): AgentVisual {
+  const seat = AGENT_SEATS[agentId]!;
+  const atlas = AGENT_ATLAS[agentId];
+  const px = seat.x * TILE_SIZE + TILE_SIZE / 2;
+  const py = seat.y * TILE_SIZE + TILE_SIZE / 2;
 
   const sprite = scene.add.sprite(px, py, atlas, 'misa-front');
   sprite.setScale(0.8);
