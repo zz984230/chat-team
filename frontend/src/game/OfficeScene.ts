@@ -9,8 +9,6 @@ const SCENE_KEY = 'OfficeScene';
 // Library room position in the full 140x100 map
 const LIB_X = 118;
 const LIB_Y = 19;
-const LIB_W = 7;
-const LIB_H = 11;
 
 export class OfficeScene extends Phaser.Scene {
   private agents: Map<string, AgentVisual> = new Map();

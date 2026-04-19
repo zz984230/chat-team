@@ -63,5 +63,5 @@ export function isLibraryWalkable(col: number, row: number): boolean {
   for (const seat of Object.values(AGENT_SEATS)) {
     if (seat.x === col && seat.y === row) return true;
   }
-  return !LIB_COLLISIONS_RAW[row][col];
+  return !LIB_COLLISIONS_RAW[row]![col];
 }
