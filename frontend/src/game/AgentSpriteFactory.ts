@@ -115,8 +115,11 @@ export function updateBubble(visual: AgentVisual, content: string | null) {
 }
 
 export function moveAgentTo(visual: AgentVisual, targetX: number, targetY: number, scene: Phaser.Scene) {
-  const px = targetX * TILE_SIZE + TILE_SIZE / 2;
-  const py = targetY * TILE_SIZE + TILE_SIZE / 2;
+  // targetX/Y are room-local coords; convert to full map pixel coords
+  const LIB_X = 118;
+  const LIB_Y = 19;
+  const px = (LIB_X + targetX) * TILE_SIZE + TILE_SIZE / 2;
+  const py = (LIB_Y + targetY) * TILE_SIZE + TILE_SIZE / 2;
 
   scene.tweens.add({
     targets: visual.sprite,
