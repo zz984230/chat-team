@@ -50,9 +50,6 @@ export function defineAnimations(scene: Phaser.Scene) {
 
   const sprite = scene.add.sprite(px, py, atlas, 'misa-front');
   sprite.setScale(0.8);
-
-  // Store agentId on the visual for animation key lookup
-  const visual: AgentVisual = {
   sprite.setInteractive({ useHandCursor: true });
   sprite.on('pointerdown', () => onClick(agentId));
   sprite.setDepth(py);
