@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@pixi/react": "^7.1.2",
+    "@pixi/tilemap": "^4.1.0",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^6.9.1",
     "ky": "^1.7.5",
