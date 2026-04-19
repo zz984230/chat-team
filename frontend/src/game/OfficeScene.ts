@@ -212,4 +212,12 @@ export class OfficeScene extends Phaser.Scene {
     const visual = this.agents.get(agentId);
     if (visual) moveAgentTo(visual, tileX, tileY, this);
   }
+
+  shutdown() {
+    this.input.off('pointerdown');
+    this.input.off('pointermove');
+    this.input.off('pointerup');
+    this.input.off('wheel');
+    this.scale.off('resize');
+  }
 }
