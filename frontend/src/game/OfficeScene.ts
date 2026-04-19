@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { TILE_SIZE, AGENT_SEATS, type AgentVisual, type GameCallbacks } from './types';
 import { defineAnimations, createAgentVisual, playAnimation, updateBubble, moveAgentTo } from './AgentSpriteFactory';
 import type { AgentAnimationState, AgentDirection } from '../types';
+import { RandomWalker } from './RandomWalker';
 
 const SCENE_KEY = 'OfficeScene';
 
@@ -14,6 +15,7 @@ const LIB_H = 11;
 export class OfficeScene extends Phaser.Scene {
   private agents: Map<string, AgentVisual> = new Map();
   private callbacks!: GameCallbacks;
+  private walkers: Map<string, RandomWalker> = new Map();
 
   constructor() {
     super({ key: SCENE_KEY });
@@ -127,6 +129,11 @@ export class OfficeScene extends Phaser.Scene {
       this.agents.set(agentId, visual);
     }
 
+    // Initialize walkers for idle wandering
+    for (const [agentId, visual] of this.agents) {
+      this.walkers.set(agentId, new RandomWalker(visual, this));
+    }
+
     // Camera — full town view with drag & zoom
     const FULL_W = 140;
     const FULL_H = 100;
@@ -191,11 +198,17 @@ export class OfficeScene extends Phaser.Scene {
     });
   }
 
-  update(_time: number, _delta: number) {}
+  update(_time: number, delta: number) {
+    for (const walker of this.walkers.values()) {
+      walker.update(delta);
+    }
+  }
 
   setAgentState(agentId: string, state: AgentAnimationState) {
     const visual = this.agents.get(agentId);
     if (visual) playAnimation(visual, state, visual.direction);
+    const walker = this.walkers.get(agentId);
+    if (walker) walker.setAgentState(state);
   }
 
   setAgentDirection(agentId: string, direction: AgentDirection) {
@@ -214,6 +227,10 @@ export class OfficeScene extends Phaser.Scene {
   }
 
   shutdown() {
+    for (const walker of this.walkers.values()) {
+      walker.destroy();
+    }
+    this.walkers.clear();
     this.input.off('pointerdown');
     this.input.off('pointermove');
     this.input.off('pointerup');
