@@ -20,16 +20,16 @@ export interface ParsedDiscussion {
 
 export function parseDiscussion(markdown: string): ParsedDiscussion {
   const reqMatch = markdown.match(/## 原始需求\n([\s\S]*?)(?=\n## )/);
-  const requirement = reqMatch ? reqMatch[1].trim() : '';
+  const requirement = reqMatch ? reqMatch[1]!.trim() : '';
 
   const turnRegex = /## (.+?)（第(\d+)轮）\n([\s\S]*?)(?=\n## |$)/g;
   const agentMap = new Map<string, DiscussionTurn[]>();
   let match: RegExpExecArray | null;
 
   while ((match = turnRegex.exec(markdown)) !== null) {
-    const agentId = match[1];
-    const round = parseInt(match[2], 10);
-    const content = match[3].trim();
+    const agentId = match[1]!;
+    const round = parseInt(match[2]!, 10);
+    const content = match[3]!.trim();
     const turns = agentMap.get(agentId) ?? [];
     turns.push({ round, content });
     agentMap.set(agentId, turns);

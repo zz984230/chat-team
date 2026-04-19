@@ -36,7 +36,7 @@ export function createAgentVisual(
   agentId: string,
   onClick: (id: string) => void,
 ): AgentVisual {
-  const seat = AGENT_SEATS[agentId];
+  const seat = AGENT_SEATS[agentId]!;
   const px = seat.x * TILE_SIZE + TILE_SIZE / 2;
   const py = seat.y * TILE_SIZE + TILE_SIZE / 2;
 

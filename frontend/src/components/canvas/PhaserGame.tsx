@@ -25,7 +25,7 @@ export function PhaserGame() {
       backgroundColor: '#1a1a2e',
       physics: {
         default: 'arcade',
-        arcade: { gravity: { y: 0 } },
+        arcade: { gravity: { x: 0, y: 0 } },
       },
       scene: scene,
       scale: {
@@ -36,7 +36,7 @@ export function PhaserGame() {
 
     scene.setCallbacks({
       onAgentClick: (agentId: string) => {
-        useUiStore.getState().setSelectedAgent(agentId);
+        useUiStore.getState().openAgentDetail(agentId);
       },
       onRoomClick: (_zone: string) => {},
     });
