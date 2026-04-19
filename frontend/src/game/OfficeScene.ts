@@ -122,6 +122,25 @@ export class OfficeScene extends Phaser.Scene {
       this.walkers.set(agentId, new RandomWalker(visual));
     }
 
+    // Interactive furniture zones
+    const tableZone = this.add.zone(
+      (LIB_X + 2.5) * TILE_SIZE,
+      (LIB_Y + 4) * TILE_SIZE,
+      2 * TILE_SIZE,
+      3 * TILE_SIZE,
+    );
+    tableZone.setInteractive({ useHandCursor: true });
+    tableZone.setDepth((LIB_Y + 5) * TILE_SIZE);
+
+    const cabinetZone = this.add.zone(
+      (LIB_X + 5) * TILE_SIZE,
+      (LIB_Y + 0.5) * TILE_SIZE,
+      3 * TILE_SIZE,
+      2 * TILE_SIZE,
+    );
+    cabinetZone.setInteractive({ useHandCursor: true });
+    cabinetZone.setDepth((LIB_Y + 0) * TILE_SIZE);
+
     // Camera — full town view with drag & zoom
     const FULL_W = 140;
     const FULL_H = 100;
@@ -143,10 +162,12 @@ export class OfficeScene extends Phaser.Scene {
     let camStartX = 0;
     let camStartY = 0;
     let dragging = false;
+    let pointerMoved = false;
 
     this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
       if (pointer.rightButtonDown()) return;
       dragging = true;
+      pointerMoved = false;
       dragStartX = pointer.x;
       dragStartY = pointer.y;
       camStartX = cam.scrollX;
@@ -155,14 +176,31 @@ export class OfficeScene extends Phaser.Scene {
 
     this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
       if (!dragging) return;
-      const dx = (pointer.x - dragStartX) / cam.zoom;
-      const dy = (pointer.y - dragStartY) / cam.zoom;
-      cam.scrollX = camStartX - dx;
-      cam.scrollY = camStartY - dy;
+      const dx = pointer.x - dragStartX;
+      const dy = pointer.y - dragStartY;
+      if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
+        pointerMoved = true;
+      }
+      if (pointerMoved) {
+        cam.scrollX = camStartX - dx / cam.zoom;
+        cam.scrollY = camStartY - dy / cam.zoom;
+      }
     });
 
     this.input.on('pointerup', () => {
       dragging = false;
+    });
+
+    tableZone.on('pointerup', () => {
+      if (!pointerMoved) {
+        this.callbacks?.onRoomClick('task');
+      }
+    });
+
+    cabinetZone.on('pointerup', () => {
+      if (!pointerMoved) {
+        this.callbacks?.onRoomClick('archive');
+      }
     });
 
     this.input.on('wheel', (_pointer: Phaser.Input.Pointer, _gameObjects: any[], _dx: number, dy: number) => {
@@ -191,6 +229,13 @@ export class OfficeScene extends Phaser.Scene {
   update(_time: number, delta: number) {
     for (const walker of this.walkers.values()) {
       walker.update(delta);
+    }
+  }
+
+  resetAllAgents() {
+    for (const walker of this.walkers.values()) {
+      walker.returnToSeat();
+      walker.setAgentState('idle');
     }
   }
 

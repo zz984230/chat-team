@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import Phaser from 'phaser';
 import { OfficeScene } from '../../game/OfficeScene';
 import { useAgentStore } from '../../stores/agentStore';
+import { useSessionStore } from '../../stores/sessionStore';
 import { useUiStore } from '../../stores/uiStore';
 import type { AgentAnimationState, AgentDirection } from '../../types';
 
@@ -38,7 +39,13 @@ export function PhaserGame() {
       onAgentClick: (agentId: string) => {
         useUiStore.getState().openAgentDetail(agentId);
       },
-      onRoomClick: (_zone: string) => {},
+      onRoomClick: (zone: string) => {
+        if (zone === 'archive') {
+          useUiStore.getState().openRoomArchive('rd');
+        } else if (zone === 'task') {
+          useUiStore.getState().openNewTaskModal('rd');
+        }
+      },
     });
 
     gameRef.current = game;
@@ -53,7 +60,23 @@ export function PhaserGame() {
   }, []);
 
   const agents = useAgentStore((s) => s.agents);
+  const activeSession = useSessionStore((s) => s.activeSession);
   const prevAgentsRef = useRef<Record<string, string>>({});
+  const prevSessionIdRef = useRef<string | null>(null);
+
+  // Reset agents BEFORE applying state changes — hook order matters
+  useEffect(() => {
+    const scene = sceneRef.current;
+    if (!scene || !scene.scene?.isActive) return;
+
+    if (activeSession && activeSession.id !== prevSessionIdRef.current) {
+      prevSessionIdRef.current = activeSession.id;
+      scene.resetAllAgents();
+      prevAgentsRef.current = {}; // clear cached state so thinking events re-apply
+    } else if (!activeSession) {
+      prevSessionIdRef.current = null;
+    }
+  }, [activeSession]);
 
   useEffect(() => {
     const scene = sceneRef.current;

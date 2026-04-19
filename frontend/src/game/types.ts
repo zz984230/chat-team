@@ -22,10 +22,10 @@ export interface AgentSeat {
 }
 
 export const AGENT_SEATS: Record<string, AgentSeat> = {
-  analyst: { x: 5, y: 3, tint: 0x53c28b },
-  architect: { x: 3, y: 5, tint: 0x7eb8da },
-  'dev-lead': { x: 5, y: 7, tint: 0xf0a500 },
-  'test-lead': { x: 1, y: 5, tint: 0xc89bda },
+  analyst:   { x: 1, y: 3, tint: 0x53c28b },
+  architect: { x: 4, y: 3, tint: 0x7eb8da },
+  'dev-lead':   { x: 1, y: 6, tint: 0xf0a500 },
+  'test-lead':  { x: 4, y: 6, tint: 0xc89bda },
 };
 
 export const TILE_SIZE = 32;

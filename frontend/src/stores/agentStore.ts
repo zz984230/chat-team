@@ -62,6 +62,7 @@ export const useAgentStore = create<AgentState>((set) => ({
               ...(state.agents[agentId] ?? defaultAgentState()),
               animationState: 'working',
               currentTool: event.tool ?? null,
+              thinkingContent: event.tool ? `使用 ${event.tool}` : null,
             },
           },
         }));

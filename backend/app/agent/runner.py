@@ -55,8 +55,8 @@ class AgentRunner:
         parts.append(f"\n\n## 任务\n{task}")
         return "".join(parts)
 
-    def _run_subprocess(self, cmd: list[str], cwd: str, env: dict, prompt_bytes: bytes) -> list[StreamEvent]:
-        """Run subprocess synchronously (called via asyncio.to_thread)."""
+    def _run_subprocess(self, cmd: list[str], cwd: str, env: dict, prompt_bytes: bytes, event_callback=None) -> list[StreamEvent]:
+        """Run subprocess synchronously (called via run_in_executor)."""
         proc = subprocess.Popen(
             cmd,
             cwd=cwd,
@@ -66,15 +66,22 @@ class AgentRunner:
             env=env,
         )
         self._process = proc
+        proc.stdin.write(prompt_bytes)
+        proc.stdin.close()
+
         events: list[StreamEvent] = []
-        stdout_data, stderr_data = proc.communicate(input=prompt_bytes)
-        self._returncode = proc.returncode
-        self._stderr = stderr_data.decode("utf-8", errors="replace").strip()
-        for line in stdout_data.decode("utf-8", errors="replace").splitlines():
-            raw = line.strip()
+        for line in proc.stdout:
+            raw = line.decode("utf-8", errors="replace").strip()
             event = parse_stream_line(raw)
             if event:
                 events.append(event)
+                if event_callback:
+                    event_callback(event)
+
+        proc.wait()
+        self._returncode = proc.returncode
+        self._stderr = proc.stderr.read().decode("utf-8", errors="replace").strip()
+        proc.stderr.close()
         return events
 
     async def execute(self, task: str, event_callback=None) -> list[StreamEvent]:
@@ -111,7 +118,7 @@ class AgentRunner:
         loop = asyncio.get_event_loop()
         prompt_bytes = prompt.encode("utf-8")
         return await loop.run_in_executor(
-            None, self._run_subprocess, cmd, str(self.config.work_dir), env, prompt_bytes,
+            None, self._run_subprocess, cmd, str(self.config.work_dir), env, prompt_bytes, event_callback,
         )
 
     async def collect_outputs(self) -> list[str]:

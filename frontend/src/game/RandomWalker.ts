@@ -143,10 +143,29 @@ export class RandomWalker {
     this.beginMove(this.col, this.row, 300, 'walking', chosen);
   }
 
-  private returnToSeat() {
+  returnToSeat() {
     this.col = this.seatCol;
     this.row = this.seatRow;
+    const tx = this.pixelX(this.seatCol);
+    const ty = this.pixelY(this.seatRow);
+    if (Math.abs(this.visual.body.x - tx) < 2 && Math.abs(this.visual.body.y - ty) < 2) {
+      this.state = 'seated';
+      playAnimation(this.visual, 'idle', this.visual.direction);
+      return;
+    }
     this.beginMove(this.seatCol, this.seatRow, 600, 'returning', this.visual.direction);
+  }
+
+  snapToSeat() {
+    this.col = this.seatCol;
+    this.row = this.seatRow;
+    this.state = 'seated';
+    this.moveElapsed = this.moveDuration; // stop any in-progress move
+    const px = this.pixelX(this.seatCol);
+    const py = this.pixelY(this.seatRow);
+    this.visual.body.setPosition(px, py);
+    syncPosition(this.visual);
+    playAnimation(this.visual, 'idle', 'down');
   }
 
   destroy() {}

@@ -5,6 +5,7 @@ from typing import Any
 
 from app.agent.pool import AgentPool
 from app.agent.runner import AgentRunner, AgentRunConfig
+from app.agent.parser import StreamEvent
 from app.vault.manager import VaultManager
 from app.ws.manager import WebSocketManager
 from app.workflow.models import (
@@ -181,10 +182,11 @@ class WorkflowEngine:
             use_casual=True,
         )
         runner = AgentRunner(agent_def, config)
+        stream_cb = self._make_stream_callback(session.id, agent_id)
 
         try:
             await runner.prepare()
-            events = await runner.execute(task)
+            events = await runner.execute(task, event_callback=stream_cb)
 
             final = next(
                 (e for e in reversed(events) if e.type == "completed" and e.content),
@@ -193,6 +195,24 @@ class WorkflowEngine:
             return final.content if final else ""
         finally:
             await runner.cleanup()
+
+    def _make_stream_callback(self, session_id: str, agent_id: str):
+        """Create a callback that forwards agent stream events via WebSocket."""
+        loop = asyncio.get_event_loop()
+
+        def callback(event: StreamEvent):
+            if event.type not in ("thinking", "working"):
+                return
+            kwargs: dict[str, Any] = {"agent_id": agent_id}
+            if event.type == "thinking" and event.content:
+                kwargs["content"] = event.content
+            if event.type == "working" and event.tool_name:
+                kwargs["tool"] = event.tool_name
+            asyncio.run_coroutine_threadsafe(
+                self.ws_manager.emit(session_id, f"agent:{event.type}", **kwargs),
+                loop,
+            )
+        return callback
 
     async def _run_phase(
         self, session: Session, phase: Any, task: str, session_dir: Path,
@@ -216,7 +236,18 @@ class WorkflowEngine:
         )
         runner = AgentRunner(agent_def, config)
 
-        result = await self.pool.submit(runner, task)
+        stream_cb = self._make_stream_callback(session.id, agent_id)
+        result = await self.pool.submit(runner, task, event_callback=stream_cb)
+
+        # Emit agent completion event
+        if result.success:
+            await self.ws_manager.emit(
+                session.id, "agent:completed", agent_id=agent_id, duration_ms=result.duration_ms,
+            )
+        else:
+            await self.ws_manager.emit(
+                session.id, "agent:failed", agent_id=agent_id, error=result.error,
+            )
 
         added = self._add_outputs(phase, result.output_files)
         phase.status = PhaseStatus.COMPLETED if result.success else PhaseStatus.FAILED
@@ -250,7 +281,19 @@ class WorkflowEngine:
                 allowed_tools=self.allowed_tools,
             )
             runner = AgentRunner(agent_def, config)
-            return await self.pool.submit(runner, task)
+            stream_cb = self._make_stream_callback(session.id, agent_id)
+            result = await self.pool.submit(runner, task, event_callback=stream_cb)
+
+            # Emit agent completion event
+            if result.success:
+                await self.ws_manager.emit(
+                    session.id, "agent:completed", agent_id=agent_id, duration_ms=result.duration_ms,
+                )
+            else:
+                await self.ws_manager.emit(
+                    session.id, "agent:failed", agent_id=agent_id, error=result.error,
+                )
+            return result
 
         results = await asyncio.gather(
             *[run_single(aid) for aid in phase.agents],
