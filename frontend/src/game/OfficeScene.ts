@@ -18,6 +18,10 @@ export class OfficeScene extends Phaser.Scene {
   }
 
   preload() {
+    this.load.on('loaderror', (file: Phaser.Loader.File) => {
+      console.error('[OfficeScene] Failed to load:', file.key, file.url);
+    });
+
     this.load.image('CuteRPG_Field_B', 'assets/tilesets/CuteRPG_Field_B.png');
     this.load.image('CuteRPG_Field_C', 'assets/tilesets/CuteRPG_Field_C.png');
     this.load.image('Room_Builder_32x32', 'assets/tilesets/Room_Builder_32x32.png');
