@@ -127,30 +127,70 @@ export class OfficeScene extends Phaser.Scene {
       this.agents.set(agentId, visual);
     }
 
-    // Camera — center on the library room
-    const cx = (LIB_X + LIB_W / 2) * TILE_SIZE;
-    const cy = (LIB_Y + LIB_H / 2) * TILE_SIZE;
-    this.cameras.main.centerOn(cx, cy);
+    // Camera — full town view with drag & zoom
+    const FULL_W = 140;
+    const FULL_H = 100;
+    const mapPixelW = FULL_W * TILE_SIZE;
+    const mapPixelH = FULL_H * TILE_SIZE;
 
-    // Zoom to show just the library room with padding
-    const zx = (this.scale.width - 40) / (LIB_W * TILE_SIZE);
-    const zy = (this.scale.height - 40) / (LIB_H * TILE_SIZE);
-    this.cameras.main.setZoom(Math.min(zx, zy));
+    const cam = this.cameras.main;
+    cam.setBounds(0, 0, mapPixelW, mapPixelH);
 
-    // Clamp camera so user can't scroll too far
-    const margin = 3 * TILE_SIZE;
-    this.cameras.main.setBounds(
-      (LIB_X - margin / TILE_SIZE) * TILE_SIZE,
-      (LIB_Y - margin / TILE_SIZE) * TILE_SIZE,
-      (LIB_W + 2 * margin / TILE_SIZE) * TILE_SIZE,
-      (LIB_H + 2 * margin / TILE_SIZE) * TILE_SIZE,
-    );
+    // Fit entire map in viewport
+    const fitZoom = Math.min(this.scale.width / mapPixelW, this.scale.height / mapPixelH);
+    cam.setZoom(fitZoom);
+    cam.centerOn(mapPixelW / 2, mapPixelH / 2);
+
+    const MIN_ZOOM = fitZoom;
+    const MAX_ZOOM = 3;
+
+    // Drag to pan
+    let dragStartX = 0;
+    let dragStartY = 0;
+    let camStartX = 0;
+    let camStartY = 0;
+    let dragging = false;
+
+    this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+      if (pointer.rightButtonDown()) return;
+      dragging = true;
+      dragStartX = pointer.x;
+      dragStartY = pointer.y;
+      camStartX = cam.scrollX;
+      camStartY = cam.scrollY;
+    });
+
+    this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
+      if (!dragging) return;
+      const dx = (pointer.x - dragStartX) / cam.zoom;
+      const dy = (pointer.y - dragStartY) / cam.zoom;
+      cam.scrollX = camStartX - dx;
+      cam.scrollY = camStartY - dy;
+    });
+
+    this.input.on('pointerup', () => {
+      dragging = false;
+    });
+
+    // Scroll to zoom (toward pointer)
+    this.input.on('wheel', (_pointer: Phaser.Input.Pointer, _gameObjects: any[], _dx: number, dy: number) => {
+      const zoomFactor = dy > 0 ? 0.9 : 1.1;
+      const newZoom = Phaser.Math.Clamp(cam.zoom * zoomFactor, MIN_ZOOM, MAX_ZOOM);
+
+      const worldPoint = cam.getWorldPoint(_pointer.x, _pointer.y);
+      const oldMidX = cam.midPoint.x;
+      const oldMidY = cam.midPoint.y;
+      cam.setZoom(newZoom);
+      cam.centerOn(
+        worldPoint.x + (oldMidX - worldPoint.x),
+        worldPoint.y + (oldMidY - worldPoint.y),
+      );
+    });
 
     this.scale.on('resize', () => {
-      const zx2 = (this.scale.width - 40) / (LIB_W * TILE_SIZE);
-      const zy2 = (this.scale.height - 40) / (LIB_H * TILE_SIZE);
-      this.cameras.main.setZoom(Math.min(zx2, zy2));
-      this.cameras.main.centerOn(cx, cy);
+      const newFitZoom = Math.min(this.scale.width / mapPixelW, this.scale.height / mapPixelH);
+      cam.setZoom(newFitZoom);
+      cam.centerOn(mapPixelW / 2, mapPixelH / 2);
     });
   }
 
