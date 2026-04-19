@@ -4,11 +4,18 @@ import type { AgentDirection, AgentAnimationState } from '../types';
 
 const ATLAS_KEY = 'atlas';
 
-const DIR_PREFIX: Record<AgentDirection, string> = {
-  down: 'down',
-  up: 'up',
-  left: 'left',
-  right: 'right',
+const DIR_ANIM: Record<AgentDirection, string> = {
+  down: 'misa-front-walk',
+  up: 'misa-back-walk',
+  left: 'misa-left-walk',
+  right: 'misa-right-walk',
+};
+
+const DIR_IDLE: Record<AgentDirection, string> = {
+  down: 'misa-front',
+  up: 'misa-back',
+  left: 'misa-left',
+  right: 'misa-right',
 };
 
 export function defineAnimations(scene: Phaser.Scene) {
@@ -16,11 +23,11 @@ export function defineAnimations(scene: Phaser.Scene) {
   const directions: AgentDirection[] = ['down', 'up', 'left', 'right'];
 
   for (const dir of directions) {
-    const prefix = DIR_PREFIX[dir];
+    const key = DIR_ANIM[dir];
     anims.create({
       key: `${dir}-walk`,
       frames: anims.generateFrameNames(ATLAS_KEY, {
-        prefix: `${prefix}-walk.`,
+        prefix: `${key}.`,
         start: 0,
         end: 3,
         zeroPad: 3,
@@ -40,7 +47,7 @@ export function createAgentVisual(
   const px = seat.x * TILE_SIZE + TILE_SIZE / 2;
   const py = seat.y * TILE_SIZE + TILE_SIZE / 2;
 
-  const sprite = scene.add.sprite(px, py, ATLAS_KEY, 'down-walk.000');
+  const sprite = scene.add.sprite(px, py, ATLAS_KEY, 'misa-front');
   sprite.setScale(0.8);
   sprite.setTint(seat.tint);
   sprite.setInteractive({ useHandCursor: true });
@@ -89,8 +96,7 @@ export function playAnimation(visual: AgentVisual, state: AgentAnimationState, d
     visual.sprite.play(`${direction}-walk`, true);
   } else {
     visual.sprite.stop();
-    const prefix = DIR_PREFIX[direction];
-    visual.sprite.setFrame(`${prefix}-walk.000`);
+    visual.sprite.setFrame(DIR_IDLE[direction]);
   }
 }
 
