@@ -53,12 +53,17 @@ export function PhaserGame() {
   }, []);
 
   const agents = useAgentStore((s) => s.agents);
+  const prevAgentsRef = useRef<Record<string, string>>({});
 
   useEffect(() => {
     const scene = sceneRef.current;
     if (!scene || !scene.scene?.isActive) return;
 
     for (const [agentId, state] of Object.entries(agents)) {
+      const key = `${state.animationState}|${state.direction}|${state.thinkingContent}|${state.targetPosition?.x},${state.targetPosition?.y}`;
+      if (prevAgentsRef.current[agentId] === key) continue;
+      prevAgentsRef.current[agentId] = key;
+
       if (state.animationState) {
         scene.setAgentState(agentId, state.animationState as AgentAnimationState);
       }

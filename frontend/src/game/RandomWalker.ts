@@ -1,8 +1,7 @@
-import type Phaser from 'phaser';
 import { TILE_SIZE, AGENT_SEATS, isLibraryWalkable } from './types';
 import type { AgentVisual } from './types';
 import type { AgentAnimationState, AgentDirection } from '../types';
-import { playAnimation } from './AgentSpriteFactory';
+import { playAnimation, syncPosition } from './AgentSpriteFactory';
 
 type WalkerState = 'seated' | 'walking' | 'returning';
 
@@ -18,7 +17,6 @@ const DIR_DELTA: Record<AgentDirection, { dx: number; dy: number }> = {
 
 export class RandomWalker {
   private visual: AgentVisual;
-  private scene: Phaser.Scene;
   private state: WalkerState = 'seated';
   private agentState: AgentAnimationState = 'idle';
 
@@ -28,11 +26,18 @@ export class RandomWalker {
   private readonly seatRow: number;
 
   private waitTimer = 0;
-  private walkTween: Phaser.Tweens.Tween | null = null;
 
-  constructor(visual: AgentVisual, scene: Phaser.Scene) {
+  // Manual movement interpolation
+  private moveStartX = 0;
+  private moveStartY = 0;
+  private moveTargetX = 0;
+  private moveTargetY = 0;
+  private moveDuration = 0;
+  private moveElapsed = 0;
+  private walkDirection: AgentDirection = 'down';
+
+  constructor(visual: AgentVisual) {
     this.visual = visual;
-    this.scene = scene;
     const seat = AGENT_SEATS[visual.agentId]!;
     this.seatCol = seat.x;
     this.seatRow = seat.y;
@@ -41,8 +46,12 @@ export class RandomWalker {
   }
 
   update(delta: number) {
+    if (this.state === 'walking' || this.state === 'returning') {
+      this.advanceMove(delta);
+    }
+
     if (this.agentState !== 'idle') return;
-    if (this.state === 'walking' || this.state === 'returning') return;
+    if (this.state !== 'seated') return;
 
     this.waitTimer -= delta;
     if (this.waitTimer <= 0) {
@@ -63,6 +72,51 @@ export class RandomWalker {
 
   private scheduleNextWalk() {
     this.waitTimer = 2000 + Math.random() * 3000;
+  }
+
+  private pixelX(c: number) { return (LIB_X + c) * TILE_SIZE + TILE_SIZE / 2; }
+  private pixelY(r: number) { return (LIB_Y + r) * TILE_SIZE + TILE_SIZE / 2; }
+
+  private beginMove(targetCol: number, targetRow: number, duration: number, state: WalkerState, dir: AgentDirection) {
+    this.moveStartX = this.visual.body.x;
+    this.moveStartY = this.visual.body.y;
+    this.moveTargetX = this.pixelX(targetCol);
+    this.moveTargetY = this.pixelY(targetRow);
+    this.moveDuration = duration;
+    this.moveElapsed = 0;
+    this.state = state;
+    this.walkDirection = dir;
+    playAnimation(this.visual, 'walking', dir);
+  }
+
+  private advanceMove(delta: number) {
+    this.moveElapsed += delta;
+    const t = Math.min(this.moveElapsed / this.moveDuration, 1);
+    const x = this.moveStartX + (this.moveTargetX - this.moveStartX) * t;
+    const y = this.moveStartY + (this.moveTargetY - this.moveStartY) * t;
+
+    this.visual.body.setPosition(x, y);
+    syncPosition(this.visual);
+
+    if (t >= 1) {
+      this.onMoveComplete();
+    }
+  }
+
+  private onMoveComplete() {
+    playAnimation(this.visual, 'idle', this.walkDirection);
+
+    if (this.state === 'walking') {
+      this.state = 'seated';
+      if (Math.random() < 0.7) {
+        this.scheduleNextWalk();
+      } else {
+        this.waitTimer = 3000 + Math.random() * 4000;
+      }
+    } else {
+      this.state = 'seated';
+      this.scheduleNextWalk();
+    }
   }
 
   private startWalk() {
@@ -86,76 +140,14 @@ export class RandomWalker {
       return;
     }
 
-    this.state = 'walking';
-    playAnimation(this.visual, 'walking', chosen);
-
-    const px = (LIB_X + this.col) * TILE_SIZE + TILE_SIZE / 2;
-    const py = (LIB_Y + this.row) * TILE_SIZE + TILE_SIZE / 2;
-
-    this.walkTween = this.scene.tweens.add({
-      targets: this.visual.sprite,
-      x: px,
-      y: py,
-      duration: 300,
-      ease: 'Linear',
-      onUpdate: () => {
-        this.visual.sprite.setDepth(this.visual.sprite.y);
-        this.visual.nameText.setPosition(this.visual.sprite.x, this.visual.sprite.y + 14);
-        this.visual.nameText.setDepth(this.visual.sprite.y);
-        this.visual.bubbleContainer.setPosition(this.visual.sprite.x, this.visual.sprite.y - 28);
-      },
-      onComplete: () => {
-        this.walkTween = null;
-        playAnimation(this.visual, 'idle', chosen!);
-        this.state = 'seated';
-        if (Math.random() < 0.7) {
-          this.scheduleNextWalk();
-        } else {
-          this.waitTimer = 3000 + Math.random() * 4000;
-        }
-      },
-    });
+    this.beginMove(this.col, this.row, 300, 'walking', chosen);
   }
 
   private returnToSeat() {
-    if (this.walkTween) {
-      this.walkTween.stop();
-      this.walkTween = null;
-    }
-
     this.col = this.seatCol;
     this.row = this.seatRow;
-    this.state = 'returning';
-
-    const px = (LIB_X + this.seatCol) * TILE_SIZE + TILE_SIZE / 2;
-    const py = (LIB_Y + this.seatRow) * TILE_SIZE + TILE_SIZE / 2;
-
-    playAnimation(this.visual, 'walking', this.visual.direction);
-
-    this.scene.tweens.add({
-      targets: this.visual.sprite,
-      x: px,
-      y: py,
-      duration: 600,
-      ease: 'Power1',
-      onUpdate: () => {
-        this.visual.sprite.setDepth(this.visual.sprite.y);
-        this.visual.nameText.setPosition(this.visual.sprite.x, this.visual.sprite.y + 14);
-        this.visual.nameText.setDepth(this.visual.sprite.y);
-        this.visual.bubbleContainer.setPosition(this.visual.sprite.x, this.visual.sprite.y - 28);
-      },
-      onComplete: () => {
-        playAnimation(this.visual, 'idle', 'down');
-        this.state = 'seated';
-        this.scheduleNextWalk();
-      },
-    });
+    this.beginMove(this.seatCol, this.seatRow, 600, 'returning', this.visual.direction);
   }
 
-  destroy() {
-    if (this.walkTween) {
-      this.walkTween.stop();
-      this.walkTween = null;
-    }
-  }
+  destroy() {}
 }
