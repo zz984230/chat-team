@@ -177,14 +177,11 @@ export class OfficeScene extends Phaser.Scene {
       const zoomFactor = dy > 0 ? 0.9 : 1.1;
       const newZoom = Phaser.Math.Clamp(cam.zoom * zoomFactor, MIN_ZOOM, MAX_ZOOM);
 
-      const worldPoint = cam.getWorldPoint(_pointer.x, _pointer.y);
-      const oldMidX = cam.midPoint.x;
-      const oldMidY = cam.midPoint.y;
+      const worldBefore = cam.getWorldPoint(_pointer.x, _pointer.y);
       cam.setZoom(newZoom);
-      cam.centerOn(
-        worldPoint.x + (oldMidX - worldPoint.x),
-        worldPoint.y + (oldMidY - worldPoint.y),
-      );
+      const worldAfter = cam.getWorldPoint(_pointer.x, _pointer.y);
+      cam.scrollX += worldBefore.x - worldAfter.x;
+      cam.scrollY += worldBefore.y - worldAfter.y;
     });
 
     this.scale.on('resize', () => {
